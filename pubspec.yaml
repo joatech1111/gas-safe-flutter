@@ -1,0 +1,29 @@
+name: gas_safe
+description: "가스안전관리 - Flutter iOS App"
+publish_to: 'none'
+version: 3.0.1010+1010
+
+environment:
+  sdk: ^3.9.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.8
+  dio: ^5.4.0
+  shared_preferences: ^2.2.2
+  geolocator: ^13.0.2
+  intl: ^0.19.0
+  fluttertoast: ^8.2.4
+  device_info_plus: ^11.2.1
+  url_launcher: ^6.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
