@@ -162,7 +162,7 @@ class CommonWidgets {
 
   static AppBar buildAppBar(BuildContext context, String title, {List<Widget>? actions, VoidCallback? onLogout}) {
     return AppBar(
-      title: Text('가스경영안전관리', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+      title: Text('가스안전관리', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
       backgroundColor: Colors.white,
       foregroundColor: Colors.black,
       elevation: 1,

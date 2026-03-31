@@ -32,7 +32,7 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> with SingleTicker
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('가스경영안전관리', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        title: Text('가스안전관리', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black87,
         elevation: 0.5,

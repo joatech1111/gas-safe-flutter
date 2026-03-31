@@ -25,7 +25,7 @@ class MainScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('가스경영안전관리', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
+        title: const Text('가스안전관리', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
         backgroundColor: Colors.white,
         foregroundColor: Colors.black,
         elevation: 1,
