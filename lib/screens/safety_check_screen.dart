@@ -45,20 +45,22 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> with SingleTicker
         ],
       ),
       // Android와 동일: 하단 탭바
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          border: Border(top: BorderSide(color: Colors.grey.shade400)),
-        ),
-        child: TabBar(
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            border: Border(top: BorderSide(color: Colors.grey.shade400)),
+          ),
+          child: TabBar(
           controller: _tabController,
           isScrollable: false,
           indicatorColor: Colors.red,
           indicatorWeight: 3,
           labelColor: Colors.red,
           unselectedLabelColor: Colors.black54,
-          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold),
-          unselectedLabelStyle: const TextStyle(fontSize: 13),
+          labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+          labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+          unselectedLabelStyle: const TextStyle(fontSize: 12),
           tabs: const [
             Tab(text: '점검이력'),
             Tab(text: '공급계약'),
@@ -66,6 +68,7 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> with SingleTicker
             Tab(text: '저장탱크'),
             Tab(text: '사용시설'),
           ],
+        ),
         ),
       ),
       body: TabBarView(

@@ -131,11 +131,13 @@ class _SafetyScreenState extends State<SafetyScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CommonWidgets.buildAppBar(context, '안전점검'),
-      body: Column(
-        children: [
-          _buildSearchPanel(),
-          Expanded(child: _buildResultList()),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchPanel(),
+            Expanded(child: _buildResultList()),
+          ],
+        ),
       ),
     );
   }

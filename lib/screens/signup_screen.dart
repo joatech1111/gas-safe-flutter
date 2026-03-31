@@ -30,10 +30,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   Future<void> _loadDeviceInfo() async {
     try {
       final deviceInfo = DeviceInfoPlugin();
-      final iosInfo = await deviceInfo.iosInfo;
-      setState(() {
+      if (Theme.of(context).platform == TargetPlatform.iOS) {
+        final iosInfo = await deviceInfo.iosInfo;
         _uuid = iosInfo.identifierForVendor ?? '';
-      });
+      } else {
+        final androidInfo = await deviceInfo.androidInfo;
+        _uuid = androidInfo.id;
+      }
+      setState(() {});
     } catch (_) {}
   }
 
@@ -67,8 +71,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
     String model = '';
     try {
       final deviceInfo = DeviceInfoPlugin();
-      final iosInfo = await deviceInfo.iosInfo;
-      model = iosInfo.model;
+      if (Theme.of(context).platform == TargetPlatform.iOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        model = iosInfo.model;
+      } else {
+        final androidInfo = await deviceInfo.androidInfo;
+        model = androidInfo.model;
+      }
     } catch (_) {}
 
     final req = {

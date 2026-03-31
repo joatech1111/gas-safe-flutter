@@ -23,7 +23,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _idController = TextEditingController(text: 'test');
-  final _pwdController = TextEditingController(text: '1234');
+  final _pwdController = TextEditingController(text: 'test');
   bool _saveLogin = false;
   bool _obscurePassword = false;
   bool _isLoading = false;
@@ -77,15 +77,20 @@ class _LoginScreenState extends State<LoginScreen> {
     String appVersion = '3.0.1010';
     try {
       final deviceInfo = DeviceInfoPlugin();
-      final iosInfo = await deviceInfo.iosInfo;
-      uuid = iosInfo.identifierForVendor ?? '';
+      if (Theme.of(context).platform == TargetPlatform.iOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        uuid = iosInfo.identifierForVendor ?? '';
+      } else {
+        final androidInfo = await deviceInfo.androidInfo;
+        uuid = androidInfo.id;
+      }
     } catch (_) {}
 
     // Android와 동일: test 계정 하드코딩
     final isTestAccount = (id == 'test');
     final req = {
       'loginId': id,
-      'loginPwd': isTestAccount && pwd == '1234' ? 'test123!@#' : pwd,
+      'loginPwd': isTestAccount && (pwd == '1234' || pwd == 'test') ? 'test123!@#' : pwd,
       'uuid': isTestAccount ? '950e673c8652deb9' : uuid,
       'mobileNumber': isTestAccount ? '01099068228' : '',
       'appVersion': appVersion,

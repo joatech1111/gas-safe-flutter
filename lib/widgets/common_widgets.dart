@@ -62,17 +62,18 @@ class CommonWidgets {
       children: [
         Expanded(
           child: SizedBox(
-            height: 40,
+            height: 36,
             child: TextField(
               controller: controller,
               decoration: InputDecoration(
                 hintText: hint,
-                hintStyle: TextStyle(fontSize: 14, color: Colors.grey.shade400),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(6), borderSide: BorderSide(color: Colors.grey.shade400)),
+                hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: Colors.grey.shade400)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: Colors.grey.shade400)),
                 isDense: true,
               ),
-              style: const TextStyle(fontSize: 14),
+              style: const TextStyle(fontSize: 13),
               onSubmitted: (_) => onSearch(),
             ),
           ),
@@ -81,9 +82,9 @@ class CommonWidgets {
         GestureDetector(
           onTap: onSearch,
           child: Container(
-            width: 40, height: 40,
-            decoration: BoxDecoration(color: const Color(0xFF555555), borderRadius: BorderRadius.circular(6)),
-            child: Image.asset('assets/images/search.png', width: 20, height: 20, color: Colors.white),
+            width: 36, height: 36,
+            decoration: BoxDecoration(color: const Color(0xFF555555), borderRadius: BorderRadius.circular(4)),
+            child: const Icon(Icons.search, size: 18, color: Colors.white),
           ),
         ),
         if (onGpsSearch != null) ...[
@@ -91,9 +92,9 @@ class CommonWidgets {
           GestureDetector(
             onTap: onGpsSearch,
             child: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(color: const Color(0xFF4A90D9), borderRadius: BorderRadius.circular(6)),
-              child: const Icon(Icons.gps_fixed, size: 20, color: Colors.white),
+              width: 36, height: 36,
+              decoration: BoxDecoration(color: const Color(0xFF4A90D9), borderRadius: BorderRadius.circular(4)),
+              child: const Icon(Icons.gps_fixed, size: 18, color: Colors.white),
             ),
           ),
         ],

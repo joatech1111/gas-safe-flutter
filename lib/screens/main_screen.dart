@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../network/net_helper.dart';
 import '../utils/app_state.dart';
@@ -23,169 +25,210 @@ class MainScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = AppState.loginUser;
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('가스안전관리', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-        backgroundColor: Colors.white,
-        foregroundColor: Colors.black,
-        elevation: 1,
-        automaticallyImplyLeading: false,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline, color: Colors.black),
-            onPressed: () {},
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('앱 종료'),
+            content: const Text('앱을 종료하시겠습니까?'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+              TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('종료')),
+            ],
           ),
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black),
-            onPressed: () => _logout(context),
-          ),
-        ],
-      ),
-      body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+        );
+        if (confirm == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFFF2F4F7),
+        appBar: AppBar(
+          title: const Text('가스안전관리', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: Colors.white)),
+          backgroundColor: const Color(0xFF3A7BD5),
+          foregroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.settings_outlined, color: Colors.white70, size: 22),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            ),
+            IconButton(
+              icon: const Icon(Icons.logout_rounded, color: Colors.white70, size: 22),
+              onPressed: () => _logout(context),
+            ),
+          ],
+        ),
+        body: SafeArea(
           child: Column(
             children: [
-              // 사용자 정보
+              // 상단 그라데이션 사용자 정보 영역
               Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade300),
+                width: double.infinity,
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Color(0xFF3A7BD5), Color(0xFF2E6BC4)],
+                  ),
+                  borderRadius: BorderRadius.only(
+                    bottomLeft: Radius.circular(24),
+                    bottomRight: Radius.circular(24),
+                  ),
                 ),
-                child: Column(
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            user?.loginCo ?? '',
-                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                          ),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.25),
+                          borderRadius: BorderRadius.circular(12),
                         ),
-                        GestureDetector(
-                          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-                          child: Image.asset('assets/images/settings.png', width: 28, height: 28),
-                        ),
-                      ],
-                    ),
-                    const Divider(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            '${user?.safeSwName ?? "(미지정)"} 님',
-                            style: const TextStyle(fontSize: 13, color: Colors.black54),
-                          ),
-                        ),
-                        Text(
-                          user?.loginLastDate ?? '',
-                          style: const TextStyle(fontSize: 13, color: Colors.black54),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 8),
-              // 메뉴 버튼들 - 항상 4개 모두 표시
-              Expanded(
-                child: Column(
-                  children: [
-                    // 모바일 검침
-                    Expanded(
-                      flex: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: _buildImageButton(
-                          context,
-                          'assets/images/metering.png',
-                          () {
-                            if (!_isSetSafeSW()) {
-                              Fluttertoast.showToast(msg: '안전관리자를 설정해주세요.');
-                              return;
-                            }
-                            if (user!.certMenu(['0', '1'])) {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const MeteringScreen()));
-                            } else {
-                              Fluttertoast.showToast(msg: '해당 메뉴에 대한 권한이 없습니다.');
-                            }
-                          },
-                        ),
+                        child: const Icon(Icons.person_rounded, color: Colors.white, size: 26),
                       ),
-                    ),
-                    // 안전 점검
-                    Expanded(
-                      flex: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: _buildImageButton(
-                          context,
-                          'assets/images/safety.png',
-                          () {
-                            if (!_isSetSafeSW()) {
-                              Fluttertoast.showToast(msg: '안전관리자를 설정해주세요.');
-                              return;
-                            }
-                            if (user!.certMenu(['0', '2'])) {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const SafetyScreen()));
-                            } else {
-                              Fluttertoast.showToast(msg: '해당 메뉴에 대한 권한이 없습니다.');
-                            }
-                          },
-                        ),
-                      ),
-                    ),
-                    // 검침현황 + 점검현황 (가로 2열)
-                    Expanded(
-                      flex: 2,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: 6),
-                        child: Row(
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Expanded(
-                              child: _buildImageButton(
-                                context,
-                                'assets/images/metering_status.png',
-                                () {
-                                  if (!_isSetSafeSW()) {
-                                    Fluttertoast.showToast(msg: '안전관리자를 설정해주세요.');
-                                    return;
-                                  }
-                                  if (user!.certMenu(['0', '1'])) {
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const MeteringStatusScreen()));
-                                  } else {
-                                    Fluttertoast.showToast(msg: '해당 메뉴에 대한 권한이 없습니다.');
-                                  }
-                                },
-                              ),
+                            Text(
+                              user?.loginCo ?? '',
+                              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
                             ),
-                            const SizedBox(width: 6),
-                            Expanded(
-                              child: _buildImageButton(
-                                context,
-                                'assets/images/safety_status.png',
-                                () {
-                                  if (!_isSetSafeSW()) {
-                                    Fluttertoast.showToast(msg: '안전관리자를 설정해주세요.');
-                                    return;
-                                  }
-                                  if (user!.certMenu(['0', '2'])) {
-                                    Navigator.push(context, MaterialPageRoute(builder: (_) => const SafetyStatusScreen()));
-                                  } else {
-                                    Fluttertoast.showToast(msg: '해당 메뉴에 대한 권한이 없습니다.');
-                                  }
-                                },
-                              ),
+                            const SizedBox(height: 3),
+                            Text(
+                              '${user?.safeSwName ?? "(미지정)"} 님',
+                              style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.85)),
                             ),
                           ],
                         ),
                       ),
-                    ),
-                    // 푸터 여백
-                    const SizedBox(height: 8),
-                  ],
+                      Text(
+                        user?.loginLastDate ?? '',
+                        style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.7)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              // 메뉴 버튼들
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    children: [
+                      // 모바일 검침
+                      Expanded(
+                        flex: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _buildImageCard(
+                            context,
+                            'assets/images/metering.png',
+                            () {
+                              if (!_isSetSafeSW()) {
+                                Fluttertoast.showToast(msg: '안전관리자를 설정해주세요.');
+                                return;
+                              }
+                              if (user!.certMenu(['0', '1'])) {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const MeteringScreen()));
+                              } else {
+                                Fluttertoast.showToast(msg: '해당 메뉴에 대한 권한이 없습니다.');
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      // 안전 점검
+                      Expanded(
+                        flex: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: _buildImageCard(
+                            context,
+                            'assets/images/safety.png',
+                            () {
+                              if (!_isSetSafeSW()) {
+                                Fluttertoast.showToast(msg: '안전관리자를 설정해주세요.');
+                                return;
+                              }
+                              if (user!.certMenu(['0', '2'])) {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const SafetyScreen()));
+                              } else {
+                                Fluttertoast.showToast(msg: '해당 메뉴에 대한 권한이 없습니다.');
+                              }
+                            },
+                          ),
+                        ),
+                      ),
+                      // 검침현황 + 점검현황 (가로 2열)
+                      Expanded(
+                        flex: 2,
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 10),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(right: 5),
+                                  child: _buildImageCard(
+                                    context,
+                                    'assets/images/metering_status.png',
+                                    () {
+                                      if (!_isSetSafeSW()) {
+                                        Fluttertoast.showToast(msg: '안전관리자를 설정해주세요.');
+                                        return;
+                                      }
+                                      if (user!.certMenu(['0', '1'])) {
+                                        Navigator.push(context, MaterialPageRoute(builder: (_) => const MeteringStatusScreen()));
+                                      } else {
+                                        Fluttertoast.showToast(msg: '해당 메뉴에 대한 권한이 없습니다.');
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                              Expanded(
+                                child: Padding(
+                                  padding: const EdgeInsets.only(left: 5),
+                                  child: _buildImageCard(
+                                    context,
+                                    'assets/images/safety_status.png',
+                                    () {
+                                      if (!_isSetSafeSW()) {
+                                        Fluttertoast.showToast(msg: '안전관리자를 설정해주세요.');
+                                        return;
+                                      }
+                                      if (user!.certMenu(['0', '2'])) {
+                                        Navigator.push(context, MaterialPageRoute(builder: (_) => const SafetyStatusScreen()));
+                                      } else {
+                                        Fluttertoast.showToast(msg: '해당 메뉴에 대한 권한이 없습니다.');
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
@@ -195,15 +238,23 @@ class MainScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildImageButton(BuildContext context, String imagePath, VoidCallback onTap) {
-    return GestureDetector(
-      onTap: onTap,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.asset(
-          imagePath,
-          width: double.infinity,
-          fit: BoxFit.fill,
+  Widget _buildImageCard(BuildContext context, String imagePath, VoidCallback onTap) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(14),
+      elevation: 2,
+      shadowColor: Colors.black.withValues(alpha: 0.1),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(14),
+          child: Image.asset(
+            imagePath,
+            width: double.infinity,
+            height: double.infinity,
+            fit: BoxFit.fill,
+          ),
         ),
       ),
     );
@@ -213,6 +264,7 @@ class MainScreen extends StatelessWidget {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('로그아웃'),
         content: const Text('로그아웃 하시겠습니까?'),
         actions: [

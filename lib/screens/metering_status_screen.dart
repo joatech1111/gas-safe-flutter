@@ -32,11 +32,13 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CommonWidgets.buildAppBar(context, '검침현황'),
-      body: Column(
-        children: [
-          _buildSearchPanel(),
-          Expanded(child: _buildResultList()),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchPanel(),
+            Expanded(child: _buildResultList()),
+          ],
+        ),
       ),
     );
   }

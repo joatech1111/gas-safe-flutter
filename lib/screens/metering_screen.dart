@@ -157,18 +157,20 @@ class _MeteringScreenState extends State<MeteringScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CommonWidgets.buildAppBar(context, '모바일검침'),
-      body: Column(
-        children: [
-          _buildSearchPanel(),
-          Expanded(child: _buildResultList()),
-          if (_resultList.isNotEmpty)
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              color: Colors.grey.shade200,
-              child: Text('총 ${_resultList.length}건', style: const TextStyle(fontSize: 12, color: Colors.black54)),
-            ),
-        ],
+      body: SafeArea(
+        child: Column(
+          children: [
+            _buildSearchPanel(),
+            Expanded(child: _buildResultList()),
+            if (_resultList.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                color: Colors.grey.shade200,
+                child: Text('총 ${_resultList.length}건', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+              ),
+          ],
+        ),
       ),
     );
   }
