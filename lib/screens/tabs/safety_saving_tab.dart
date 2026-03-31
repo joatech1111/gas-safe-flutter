@@ -1,6 +1,8 @@
+import '../../widgets/logo_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/safety_customer_result_data.dart';
 import '../../models/safety_saving_result_data.dart';
 import '../../network/net_helper.dart';
@@ -138,7 +140,7 @@ class _SafetySavingTabState extends State<SafetySavingTab> with AutomaticKeepAli
     _anzCuConfirmTelController.text = widget.customer.cuHp ?? '';
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool sendSMS = false}) async {
     Position? pos;
     try { pos = await Geolocator.getCurrentPosition(); } catch (_) {}
 
@@ -154,6 +156,7 @@ class _SafetySavingTabState extends State<SafetySavingTab> with AutomaticKeepAli
       'ANZ_CU_Confirm': '',
       'ANZ_CU_Confirm_TEL': _anzCuConfirmTelController.text,
       'ANZ_Sign_YN': '',
+      'ANZ_CU_SMS_YN': sendSMS ? Keys.y : Keys.n,
       'GPS_X': pos?.longitude.toString() ?? '',
       'GPS_Y': pos?.latitude.toString() ?? '',
       'ANZ_User_ID': AppState.loginUserId,
@@ -184,13 +187,45 @@ class _SafetySavingTabState extends State<SafetySavingTab> with AutomaticKeepAli
       Fluttertoast.showToast(msg: _isNew ? '저장되었습니다.' : '수정되었습니다.');
       final resultData = resp['resultData'];
       if (resultData != null && resultData['po_ANZ_Sno'] != null) {
-        _anzSno = resultData['po_ANZ_Sno'];
+        _anzSno = resultData['po_ANZ_Sno'].toString();
         _isNew = false;
       }
+      if (sendSMS) _sendSMS();
       setState(() {});
     } else {
       NetHelper.handleError(context, resp);
     }
+  }
+
+  Future<void> _sendSMS() async {
+    final areaCode = widget.customer.areaCode ?? AppState.areaCode;
+    final smsResp = await NetHelper.api.safetySms(areaCode, Keys.smsDivSaving);
+    String smsMsg = '';
+    if (NetHelper.isSuccess(smsResp) && smsResp['resultData'] != null) {
+      smsMsg = smsResp['resultData']['SMS_Msg']?.toString() ?? '';
+    }
+
+    // Calculate pass/fail result
+    bool hasFailed = false;
+    for (int i = 1; i <= 10; i++) {
+      final val = _items['ANZ_Item$i'] ?? '';
+      if (val == Keys.savingFailed) { hasFailed = true; break; }
+    }
+    final resultText = hasFailed ? '부적합' : '적합';
+
+    smsMsg = smsMsg
+        .replaceAll('{거래처명}', widget.customer.cuNameView ?? widget.customer.cuName ?? '')
+        .replaceAll('{영업소코드}', areaCode)
+        .replaceAll('{거래처코드}', widget.customer.cuCode ?? '')
+        .replaceAll('{주소}', '${widget.customer.cuAddr1 ?? ''} ${widget.customer.cuAddr2 ?? ''}')
+        .replaceAll('{점검일}', _anzDateController.text)
+        .replaceAll('{점검원}', AppState.safeSwName)
+        .replaceAll('{점검결과}', resultText);
+
+    final tel = _anzCuConfirmTelController.text.trim();
+    if (tel.isEmpty) { Fluttertoast.showToast(msg: '확인 연락처를 입력해주세요.'); return; }
+    final uri = Uri(scheme: 'sms', path: tel, queryParameters: {'body': smsMsg});
+    if (await canLaunchUrl(uri)) { await launchUrl(uri); }
   }
 
   Future<void> _delete() async {
@@ -241,7 +276,7 @@ class _SafetySavingTabState extends State<SafetySavingTab> with AutomaticKeepAli
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) return Center(child: LogoLoader(size: 100));
 
     return Column(
       children: [
@@ -340,17 +375,57 @@ class _SafetySavingTabState extends State<SafetySavingTab> with AutomaticKeepAli
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4, offset: const Offset(0, -2))]),
-      child: Row(
-        children: [
-          if (!_isNew)
-            Expanded(child: ElevatedButton(onPressed: _delete,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                child: const Text('삭제'))),
-          if (!_isNew) const SizedBox(width: 8),
-          Expanded(flex: 2, child: ElevatedButton(onPressed: _save,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF555555), foregroundColor: Colors.white),
-              child: Text(_isNew ? '저장' : '수정'))),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Expanded(child: _actionBtn('점검 저장', const Color(0xFF555555), () async {
+                  final ok = await _confirmDialog('정말 저장하시겠습니까?');
+                  if (ok) _save();
+                })),
+                const SizedBox(width: 8),
+                Expanded(child: _actionBtn('저장 후 SMS 전송', const Color(0xFF5CB85C), () async {
+                  final ok = await _confirmDialog('정말로 SMS를 발송하시겠습니까?');
+                  if (ok) _save(sendSMS: true);
+                })),
+              ],
+            ),
+            if (!_isNew) ...[
+              const SizedBox(height: 8),
+              SizedBox(
+                width: double.infinity,
+                child: _actionBtn('삭제', Colors.red, _delete),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDialog(String message) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('확인')),
         ],
+      ),
+    );
+    return result == true;
+  }
+
+  Widget _actionBtn(String text, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 44, alignment: Alignment.center,
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
+        child: Text(text, style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
       ),
     );
   }

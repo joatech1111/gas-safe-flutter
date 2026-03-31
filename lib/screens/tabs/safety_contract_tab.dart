@@ -1,3 +1,4 @@
+import '../../widgets/logo_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geolocator/geolocator.dart';
@@ -50,6 +51,25 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
   final _cuGongNameController = TextEditingController();
   final _cuGongNoController = TextEditingController();
   final _anzCuConfirmTelController = TextEditingController();
+
+  // 공급자 소유 설비
+  final _cylController = TextEditingController();
+  final _cylMemoController = TextEditingController();
+  final _meterController = TextEditingController();
+  final _meterMemoController = TextEditingController();
+  final _transController = TextEditingController();
+  final _transMemoController = TextEditingController();
+  final _vaporController = TextEditingController();
+  final _vaporMemoController = TextEditingController();
+  final _pipeController = TextEditingController();
+  final _pipeMemoController = TextEditingController();
+  final _facilityController = TextEditingController();
+
+  // 소비자 불만신고 센터
+  final _centerSiController = TextEditingController();
+  final _centerConsumerController = TextEditingController();
+  final _centerKgsController = TextEditingController();
+  final _centerGasController = TextEditingController();
 
   String _saleType = '';
   String _contType = '';
@@ -133,6 +153,21 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     _cuGongNameController.text = d.cuGongName ?? '';
     _cuGongNoController.text = d.cuGongNo ?? '';
     _anzCuConfirmTelController.text = d.anzCuConfirmTel ?? '';
+    _cylController.text = d.useCyl ?? '';
+    _cylMemoController.text = d.useCylMemo ?? '';
+    _meterController.text = d.useMeter ?? '';
+    _meterMemoController.text = d.useMeterMemo ?? '';
+    _transController.text = d.useTrans ?? '';
+    _transMemoController.text = d.useTransMemo ?? '';
+    _vaporController.text = d.useVapor ?? '';
+    _vaporMemoController.text = d.useVaporMemo ?? '';
+    _pipeController.text = d.usePipe ?? '';
+    _pipeMemoController.text = d.usePipeMemo ?? '';
+    _facilityController.text = d.useFacility ?? '';
+    _centerSiController.text = d.centerSi ?? '';
+    _centerConsumerController.text = d.centerConsumer ?? '';
+    _centerKgsController.text = d.centerKgs ?? '';
+    _centerGasController.text = d.centerGas ?? '';
     _saleType = d.saleType ?? '';
     _contType = d.contType ?? '';
   }
@@ -181,13 +216,14 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       'ANZ_Date_T': _ensureDate(_anzDateTController.text, DateUtil.afterDays(365)),
       'SALE_TYPE': _saleType,
       'CONT_TYPE': _contType,
-      'USE_CYL': '', 'USE_CYL_MEMO': '',
-      'USE_METER': '', 'USE_METER_MEMO': '',
-      'USE_TRANS': '', 'USE_TRANS_MEMO': '',
-      'USE_VAPOR': '', 'USE_VAPOR_MEMO': '',
-      'USE_PIPE': '', 'USE_PIPE_MEMO': '',
-      'USE_Facility': '',
-      'CENTER_SI': '', 'CENTER_Consumer': '', 'CENTER_KGS': '', 'CENTER_GAS': '',
+      'USE_CYL': _cylController.text, 'USE_CYL_MEMO': _cylMemoController.text,
+      'USE_METER': _meterController.text, 'USE_METER_MEMO': _meterMemoController.text,
+      'USE_TRANS': _transController.text, 'USE_TRANS_MEMO': _transMemoController.text,
+      'USE_VAPOR': _vaporController.text, 'USE_VAPOR_MEMO': _vaporMemoController.text,
+      'USE_PIPE': _pipeController.text, 'USE_PIPE_MEMO': _pipeMemoController.text,
+      'USE_Facility': _facilityController.text,
+      'CENTER_SI': _centerSiController.text, 'CENTER_Consumer': _centerConsumerController.text,
+      'CENTER_KGS': _centerKgsController.text, 'CENTER_GAS': _centerGasController.text,
       'COM_BEFORE': '',
       'COM_NO': _comNoController.text,
       'COM_NAME': _comNameController.text,
@@ -308,7 +344,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) return Center(child: LogoLoader(size: 100));
 
     return Column(
       children: [
@@ -329,6 +365,12 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
                 const SizedBox(height: 8),
                 // 공급계약 내용 토글
                 _buildContractContentToggle(),
+                const SizedBox(height: 8),
+                // 공급자 소유 설비
+                _buildSupplierEquipSection(),
+                const SizedBox(height: 8),
+                // 소비자 불만신고 센터
+                _buildComplaintCenterSection(),
                 const SizedBox(height: 8),
                 // 공급자 정보
                 _buildSupplierSection(),
@@ -571,6 +613,71 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     );
   }
 
+  Widget _buildSupplierEquipSection() {
+    return _expandableSection('공급자 소유 설비', [
+      _equipRow('용기', _cylController, _cylMemoController),
+      _equipRow('계량기', _meterController, _meterMemoController),
+      _equipRow('절체기', _transController, _transMemoController),
+      _equipRow('기화기', _vaporController, _vaporMemoController),
+      _equipRow('공급관', _pipeController, _pipeMemoController),
+      const SizedBox(height: 6),
+      const Text('부속설비', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+      const SizedBox(height: 4),
+      Container(
+        height: 60,
+        decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
+        child: TextField(
+          controller: _facilityController,
+          maxLines: 3,
+          decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.all(8), isDense: true),
+          style: const TextStyle(fontSize: 12),
+        ),
+      ),
+    ]);
+  }
+
+  Widget _equipRow(String label, TextEditingController qtyCtrl, TextEditingController memoCtrl) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          SizedBox(width: 55, child: Text(label, style: const TextStyle(fontSize: 12))),
+          SizedBox(width: 60, child: Container(
+            height: 30,
+            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
+            child: TextField(
+              controller: qtyCtrl,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 6), isDense: true),
+              style: const TextStyle(fontSize: 12),
+            ),
+          )),
+          const SizedBox(width: 8),
+          const Text('비고:', style: TextStyle(fontSize: 11, color: Colors.black54)),
+          const SizedBox(width: 4),
+          Expanded(child: Container(
+            height: 30,
+            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
+            child: TextField(
+              controller: memoCtrl,
+              decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 6), isDense: true),
+              style: const TextStyle(fontSize: 12),
+            ),
+          )),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildComplaintCenterSection() {
+    return _expandableSection('소비자 불만신고 센터', [
+      _formField('시.군.구청', _centerSiController),
+      _formField('소비자단체', _centerConsumerController),
+      _formField('한국가스공사', _centerKgsController),
+      _formField('가스공급자단체', _centerGasController),
+    ]);
+  }
+
   Widget _buildSupplierSection() {
     final hasSign = _signatureSupplier != null && _signatureSupplier!.isNotEmpty;
     return _expandableSection('공급자 정보', [
@@ -679,18 +786,45 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
   Widget _buildActionButtons() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
+      child: Column(
         children: [
+          Row(
+            children: [
+              Expanded(child: _actionBtn('점검 저장', const Color(0xFF555555), () async {
+                final ok = await _confirmDialog('정말 저장하시겠습니까?');
+                if (ok) _save();
+              })),
+              const SizedBox(width: 8),
+              Expanded(child: _actionBtn('저장 후 SMS 전송', const Color(0xFF5CB85C), () async {
+                final ok = await _confirmDialog('정말로 SMS를 발송하시겠습니까?');
+                if (ok) _save(sendSMS: true);
+              })),
+            ],
+          ),
           if (!_isNew) ...[
-            Expanded(child: _actionBtn('삭제', Colors.red, _delete)),
-            const SizedBox(width: 8),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: _actionBtn('삭제', Colors.red, _delete),
+            ),
           ],
-          Expanded(flex: 2, child: _actionBtn(_isNew ? '저장' : '수정', Colors.grey.shade800, () => _save())),
-          const SizedBox(width: 8),
-          Expanded(flex: 2, child: _actionBtn(_isNew ? '저장+SMS' : '수정+SMS', const Color(0xFF5CB85C), () => _save(sendSMS: true))),
         ],
       ),
     );
+  }
+
+  Future<bool> _confirmDialog(String message) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('확인')),
+        ],
+      ),
+    );
+    return result == true;
   }
 
   Widget _actionBtn(String text, Color color, VoidCallback onTap) {
@@ -721,6 +855,14 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     _custComNoController.dispose(); _custComNameController.dispose(); _custTelController.dispose();
     _cuAddr1Controller.dispose(); _cuAddr2Controller.dispose();
     _cuGongNameController.dispose(); _cuGongNoController.dispose(); _anzCuConfirmTelController.dispose();
+    _cylController.dispose(); _cylMemoController.dispose();
+    _meterController.dispose(); _meterMemoController.dispose();
+    _transController.dispose(); _transMemoController.dispose();
+    _vaporController.dispose(); _vaporMemoController.dispose();
+    _pipeController.dispose(); _pipeMemoController.dispose();
+    _facilityController.dispose();
+    _centerSiController.dispose(); _centerConsumerController.dispose();
+    _centerKgsController.dispose(); _centerGasController.dispose();
     super.dispose();
   }
 }

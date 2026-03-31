@@ -1,6 +1,8 @@
+import '../../widgets/logo_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../models/safety_customer_result_data.dart';
 import '../../models/safety_equip_result_data.dart';
 import '../../network/net_helper.dart';
@@ -166,7 +168,7 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
     _anzCuConfirmTelController.text = widget.customer.cuHp ?? '';
   }
 
-  Future<void> _save() async {
+  Future<void> _save({bool sendSMS = false}) async {
     Position? pos;
     try { pos = await Geolocator.getCurrentPosition(); } catch (_) {}
 
@@ -189,7 +191,7 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
       'ANZ_Gita_01': _gita01Controller.text,
       'ANZ_Gita_02': _gita02Controller.text,
       'ANZ_CU_Confirm': '',
-      'ANZ_CU_SMS_YN': '',
+      'ANZ_CU_SMS_YN': sendSMS ? 'Y' : 'N',
       'ANZ_Sign_YN': '',
       'GPS_X': pos?.longitude.toString() ?? '',
       'GPS_Y': pos?.latitude.toString() ?? '',
@@ -224,6 +226,7 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
         _anzSno = resultData['po_ANZ_Sno'];
         _isNew = false;
       }
+      if (sendSMS) _sendSMS();
       setState(() {});
     } else {
       NetHelper.handleError(context, resp);
@@ -265,7 +268,7 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    if (_isLoading) return const Center(child: CircularProgressIndicator());
+    if (_isLoading) return Center(child: LogoLoader(size: 100));
 
     return Column(
       children: [
@@ -404,19 +407,86 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
         color: Colors.white,
         boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4, offset: const Offset(0, -2))],
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          if (!_isNew)
-            Expanded(child: ElevatedButton(onPressed: _delete,
-                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
-                child: const Text('삭제'))),
-          if (!_isNew) const SizedBox(width: 8),
-          Expanded(flex: 2, child: ElevatedButton(onPressed: _save,
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF555555), foregroundColor: Colors.white),
-              child: Text(_isNew ? '저장' : '수정'))),
+          Row(
+            children: [
+              Expanded(child: _actionBtn('점검 저장', const Color(0xFF555555), () async {
+                final ok = await _confirmDialog('정말 저장하시겠습니까?');
+                if (ok) _save(sendSMS: false);
+              })),
+              const SizedBox(width: 8),
+              Expanded(child: _actionBtn('저장 후 SMS 전송', const Color(0xFF5CB85C), () async {
+                final ok = await _confirmDialog('정말로 SMS를 발송하시겠습니까?');
+                if (ok) _save(sendSMS: true);
+              })),
+            ],
+          ),
+          if (!_isNew) ...[
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: _actionBtn('삭제', Colors.red, _delete),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  Widget _actionBtn(String text, Color color, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 44, alignment: Alignment.center,
+        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
+        child: Text(text, style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
+    );
+  }
+
+  Future<bool> _confirmDialog(String message) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('확인')),
+        ],
+      ),
+    );
+    return result == true;
+  }
+
+  Future<void> _sendSMS() async {
+    final areaCode = widget.customer.areaCode ?? AppState.areaCode;
+    final smsResp = await NetHelper.api.safetySms(areaCode, Keys.smsDivEquip);
+    String smsMsg = '';
+    if (NetHelper.isSuccess(smsResp) && smsResp['resultData'] != null) {
+      smsMsg = smsResp['resultData']['SMS_Msg']?.toString() ?? '';
+    }
+
+    // Calculate pass/fail result
+    String result = '적합';
+    for (final entry in _checkItems.entries) {
+      if (entry.value == '2') { result = '부적합'; break; }
+    }
+
+    smsMsg = smsMsg
+        .replaceAll('{거래처명}', widget.customer.cuNameView ?? widget.customer.cuName ?? '')
+        .replaceAll('{영업소코드}', areaCode)
+        .replaceAll('{거래처코드}', widget.customer.cuCode ?? '')
+        .replaceAll('{주소}', '${widget.customer.cuAddr1 ?? ''} ${widget.customer.cuAddr2 ?? ''}')
+        .replaceAll('{점검일}', _anzDateController.text)
+        .replaceAll('{점검원}', AppState.safeSwName)
+        .replaceAll('{점검결과}', result);
+
+    final tel = _anzCuConfirmTelController.text.trim().replaceAll('-', '');
+    if (tel.isEmpty) { Fluttertoast.showToast(msg: '확인 연락처를 입력해주세요.'); return; }
+    final uri = Uri(scheme: 'sms', path: tel, queryParameters: {'body': smsMsg});
+    if (await canLaunchUrl(uri)) { await launchUrl(uri); }
   }
 
   Widget _sectionTitle(String title) {

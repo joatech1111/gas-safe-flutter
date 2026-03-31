@@ -1,3 +1,4 @@
+import '../widgets/logo_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import '../models/combo_data.dart';
@@ -120,7 +121,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       appBar: CommonWidgets.buildAppBar(context, '설정'),
       body: SafeArea(
         child: _isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? Center(child: LogoLoader(size: 100))
             : SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

@@ -1,3 +1,4 @@
+import '../../widgets/logo_loader.dart';
 import 'package:flutter/material.dart';
 import '../../models/safety_customer_result_data.dart';
 import '../../models/safety_history_result_data.dart';
@@ -82,7 +83,7 @@ class _SafetyHistoryTabState extends State<SafetyHistoryTab> with AutomaticKeepA
     super.build(context);
 
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: LogoLoader(size: 100));
     }
 
     return Column(

@@ -4,6 +4,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'api_service.dart';
 import '../screens/login_screen.dart';
+import '../widgets/logo_loader.dart';
 
 class NetHelper {
   static final ApiService api = ApiService();
@@ -20,8 +21,8 @@ class NetHelper {
     if (showProgress && context.mounted) {
       overlayEntry = OverlayEntry(
         builder: (_) => Container(
-          color: Colors.black26,
-          child: const Center(child: CircularProgressIndicator()),
+          color: Colors.black38,
+          child: const Center(child: LogoLoader(size: 120)),
         ),
       );
       // 빌드 중이면 한 프레임 뒤에 삽입

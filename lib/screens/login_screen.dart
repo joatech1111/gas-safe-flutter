@@ -259,7 +259,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         child: ElevatedButton(
                           onPressed: _isLoading ? null : _doLogin,
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4A90D9),
+                            backgroundColor: const Color(0xFF555555),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           child: _isLoading
@@ -277,7 +277,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen()));
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF4A90D9),
+                            backgroundColor: const Color(0xFF555555),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           child: const Text('가입신청', style: TextStyle(fontSize: 18, color: Colors.white)),
