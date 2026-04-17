@@ -23,8 +23,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _idController = TextEditingController(text: 'test2');
-  final _pwdController = TextEditingController(text: 'test2');
+  final _idController = TextEditingController();
+  final _pwdController = TextEditingController();
   final _phoneController = TextEditingController();
   final _phonePwdController = TextEditingController();
   bool _saveLogin = false;
@@ -215,23 +215,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final resultData = resp['resultData'];
 
-    // resultData가 List이면 (복수 또는 단일) 업체 목록 표시
+    // resultData가 List이면 (복수 또는 단일) 업체 목록 BottomSheet 표시
     if (resultData is List && resultData.isNotEmpty) {
-      setState(() {
-        _multiUserList = resultData;
-        _selectedUser = null;
-        _phoneStep = 0;
-      });
+      _multiUserList = resultData;
+      _showCompanyBottomSheet();
       return;
     }
 
-    // resultData가 Map이면 단일 사용자 → 바로 목록 1건으로 표시
+    // resultData가 Map이면 단일 사용자 → 바로 목록 1건으로 BottomSheet 표시
     if (resultData is Map<String, dynamic>) {
-      setState(() {
-        _multiUserList = [resultData];
-        _selectedUser = null;
-        _phoneStep = 0;
-      });
+      _multiUserList = [resultData];
+      _showCompanyBottomSheet();
       return;
     }
 
@@ -310,154 +304,143 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  /// 업체 목록 선택 UI
-  Widget _buildCompanyList() {
-    if (_multiUserList.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 16),
-        // 헤더
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: const BoxDecoration(
-            color: Color(0xFF1976D2),
-            borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
+  /// 업체 목록 BottomSheet 표시
+  void _showCompanyBottomSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.of(context).size.height * 0.6,
           ),
-          child: Row(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.business, color: Colors.white, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                '업체 선택 (${_multiUserList.length}건)',
-                style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Colors.white),
+              // 드래그 핸들
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFDDDDDD),
+                  borderRadius: BorderRadius.circular(2),
+                ),
               ),
-              const Spacer(),
-              GestureDetector(
-                onTap: () => setState(() {
-                  _multiUserList = [];
-                  _selectedUser = null;
-                  _phoneStep = 0;
-                  _phonePwdController.clear();
-                }),
-                child: const Icon(Icons.close, color: Colors.white70, size: 20),
+              // 헤더
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.business, color: Color(0xFF1976D2), size: 22),
+                    const SizedBox(width: 8),
+                    Text(
+                      '업체 선택 (${_multiUserList.length}건)',
+                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                    ),
+                    const Spacer(),
+                    IconButton(
+                      onPressed: () => Navigator.pop(ctx),
+                      icon: const Icon(Icons.close, color: Color(0xFF999999)),
+                      splashRadius: 20,
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(height: 1),
+              // 목록
+              Flexible(
+                child: ListView.separated(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  itemCount: _multiUserList.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1, indent: 60, endIndent: 16),
+                  itemBuilder: (_, i) {
+                    final user = _multiUserList[i];
+                    final name = (user['Login_Name'] ?? '').toString();
+                    final id = (user['Login_User'] ?? '').toString();
+                    final company = (user['Login_Co'] ?? '').toString();
+                    final model = (user['HP_Model'] ?? '').toString();
+                    final hpState = (user['HP_State'] ?? '').toString();
+                    final isActive = hpState == 'Y';
+
+                    return InkWell(
+                      onTap: () {
+                        Navigator.pop(ctx);
+                        setState(() {
+                          _selectedUser = user;
+                          _phoneStep = 1;
+                        });
+                      },
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 34,
+                              height: 34,
+                              decoration: BoxDecoration(
+                                color: isActive ? const Color(0xFF1976D2) : const Color(0xFFBBBBBB),
+                                shape: BoxShape.circle,
+                              ),
+                              alignment: Alignment.center,
+                              child: Text(
+                                '${i + 1}',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    children: [
+                                      Flexible(
+                                        child: Text(
+                                          company.isNotEmpty ? company : (name.isNotEmpty ? name : id),
+                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      if (isActive) ...[
+                                        const SizedBox(width: 6),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFF4CAF50),
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: const Text('사용중', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    '${name.isNotEmpty ? "$name / " : ""}$id${model.isNotEmpty ? " / $model" : ""}',
+                                    style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            const Icon(Icons.chevron_right, color: Color(0xFFCCCCCC), size: 22),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ),
             ],
           ),
-        ),
-        // 목록
-        Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: const Color(0xFFDDDDDD)),
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
-          ),
-          child: ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _multiUserList.length,
-            separatorBuilder: (_, __) => const Divider(height: 1, indent: 12, endIndent: 12),
-            itemBuilder: (_, i) {
-              final user = _multiUserList[i];
-              final name = user['Login_Name'] ?? '';
-              final id = user['Login_User'] ?? '';
-              final company = user['Login_Co'] ?? '';
-              final model = user['HP_Model'] ?? '';
-              final imei = user['HP_IMEI'] ?? '';
-              final hpState = user['HP_State'] ?? '';
-              final isActive = hpState == 'Y';
-              final isSelected = _selectedUser != null && _selectedUser!['HP_IMEI'] == imei;
-
-              return Material(
-                color: isSelected ? const Color(0xFFE3F2FD) : Colors.white,
-                borderRadius: i == _multiUserList.length - 1
-                    ? const BorderRadius.vertical(bottom: Radius.circular(8))
-                    : BorderRadius.zero,
-                child: InkWell(
-                  borderRadius: i == _multiUserList.length - 1
-                      ? const BorderRadius.vertical(bottom: Radius.circular(8))
-                      : BorderRadius.zero,
-                  onTap: () {
-                    setState(() {
-                      _selectedUser = user;
-                      _phoneStep = 1;
-                    });
-                  },
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                    child: Row(
-                      children: [
-                        // 선택 상태 아이콘
-                        Container(
-                          width: 32,
-                          height: 32,
-                          decoration: BoxDecoration(
-                            color: isSelected
-                                ? const Color(0xFF1976D2)
-                                : (isActive ? const Color(0xFF90CAF9) : const Color(0xFFBBBBBB)),
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: isSelected
-                              ? const Icon(Icons.check, color: Colors.white, size: 18)
-                              : Text(
-                                  '${i + 1}',
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                                ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Flexible(
-                                    child: Text(
-                                      company.isNotEmpty ? company : (name.isNotEmpty ? name : id),
-                                      style: TextStyle(
-                                        fontSize: 16,
-                                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                        color: isSelected ? const Color(0xFF1976D2) : const Color(0xFF333333),
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (isActive) ...[
-                                    const SizedBox(width: 6),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF4CAF50),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: const Text('사용중', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                '${name.isNotEmpty ? "$name / " : ""}$id${model.isNotEmpty ? " / $model" : ""}',
-                                style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Icon(
-                          isSelected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
-                          color: isSelected ? const Color(0xFF1976D2) : const Color(0xFFCCCCCC),
-                          size: 22,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
+        );
+      },
     );
   }
 
@@ -750,10 +733,7 @@ class _LoginScreenState extends State<LoginScreen> {
           ],
         ),
 
-        // ── Step 1: 업체 목록 ──
-        _buildCompanyList(),
-
-        // ── Step 2: 선택된 업체 표시 + 비밀번호 ──
+        // ── Step 1: 선택된 업체 표시 + 비밀번호 ──
         if (_phoneStep == 1 && _selectedUser != null) ...[
           const SizedBox(height: 16),
           // 선택된 업체 표시
@@ -786,11 +766,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
                 GestureDetector(
-                  onTap: () => setState(() {
-                    _selectedUser = null;
-                    _phoneStep = 0;
+                  onTap: () {
                     _phonePwdController.clear();
-                  }),
+                    _showCompanyBottomSheet();
+                  },
                   child: const Icon(Icons.edit, color: Color(0xFF1976D2), size: 20),
                 ),
               ],

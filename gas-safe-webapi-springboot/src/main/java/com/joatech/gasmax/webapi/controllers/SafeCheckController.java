@@ -1695,8 +1695,7 @@ public class SafeCheckController {
 
 			fileDownloadController.createPDF(randomString.toString(), anCont);
 
-			//String CONT_FILE_URL = "http://118.222.92.10:9494/download/" + randomString.toString() + ".pdf";
-			String CONT_FILE_URL = "http://121.254.173.234:9999/download/" + randomString.toString() + ".pdf";
+			String CONT_FILE_URL = "http://gas.joaoffice.com:14013/download/" + randomString.toString() + ".pdf";
 
 
 

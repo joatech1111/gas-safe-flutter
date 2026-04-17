@@ -1,6 +1,6 @@
 class NetConfig {
-  static const String baseUrl = 'http://192.168.0.72:14003/gas/api/';
-  //static const String baseUrl = 'http://gas.joaoffice.com:14013/gas/api/'; //전화번호 인증 추가 서버
+  //static const String baseUrl = 'http://192.168.0.72:14003/gas/api/';
+  static const String baseUrl = 'http://gas.joaoffice.com:14013/gas/api/'; //todo: 전화번호 인증 추가 서버
   //static const String baseUrl = 'http://gas.joaoffice.com:14001/gas/api/';
 
   static const int timeoutConnect = 40000;
