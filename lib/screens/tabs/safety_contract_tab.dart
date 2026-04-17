@@ -327,15 +327,22 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
 
   Future<void> _sendSMS({String? contractUrl}) async {
     final areaCode = widget.customer.areaCode ?? AppState.areaCode;
-    final smsResp = await NetHelper.api.safetySms(areaCode, Keys.smsDivContract);
-    String smsMsg = '';
-    if (NetHelper.isSuccess(smsResp) && smsResp['resultData'] != null) {
-      smsMsg = smsResp['resultData']['SMS_Msg']?.toString() ?? '';
-    }
     final normalizedContractUrl = (contractUrl ?? _pdfFileUrl ?? '').trim();
     final gUrl = normalizedContractUrl.isEmpty
         ? ''
         : 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(normalizedContractUrl)}';
+    final smsResp = await NetHelper.api.safetySms(
+      areaCode,
+      Keys.smsDivContract,
+      extraQuery: {
+        if (normalizedContractUrl.isNotEmpty) 'cont_file_url': normalizedContractUrl,
+        if (gUrl.isNotEmpty) 'preview_url': gUrl,
+      },
+    );
+    String smsMsg = '';
+    if (NetHelper.isSuccess(smsResp) && smsResp['resultData'] != null) {
+      smsMsg = smsResp['resultData']['SMS_Msg']?.toString() ?? '';
+    }
     smsMsg = smsMsg
         .replaceAll('{공급자상호}', _comNameController.text)
         .replaceAll('{거래처명}', widget.customer.cuNameView ?? widget.customer.cuName ?? '')

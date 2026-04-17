@@ -267,8 +267,14 @@ class ApiService {
   Future<Map<String, dynamic>> safetySavingDelete(Map<String, dynamic> req) =>
       _request(() => _dio.delete('safetycheck/saving', data: req));
 
-  Future<Map<String, dynamic>> safetySms(String areaCode, String smsDiv) =>
-      _request(() => _dio.get('safetycheck/sms/${areaCode.trim()}/$smsDiv'));
+  Future<Map<String, dynamic>> safetySms(
+    String areaCode,
+    String smsDiv, {
+    Map<String, dynamic>? extraQuery,
+  }) => _request(() => _dio.get(
+        'safetycheck/sms/${areaCode.trim()}/$smsDiv',
+        queryParameters: extraQuery,
+      ));
 
   Future<Map<String, dynamic>> safetyStatusSearchKeyword(Map<String, dynamic> req) =>
       _request(() => _dio.post('safetycheck/status/search/keyword', data: req));

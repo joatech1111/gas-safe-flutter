@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 import java.util.HashMap;
 
@@ -989,6 +991,8 @@ public class SafeCheckController {
 	public RestAPIResult smsNoticeSmsDiv(
 			@PathVariable("area_code") String areaCode,
 			@PathVariable("sms_div") String smsDiv,
+			@RequestParam(value = "cont_file_url", required = false) Optional<String> optContFileUrl,
+			@RequestParam(value = "preview_url", required = false) Optional<String> optPreviewUrl,
 			@RequestParam("sessionid") Optional<String> optSessionId)
 					throws SessionIdNotReceivedException, InvalidSessionIdException {
 		String result = GasMaxErrors.ERROR_OK;
@@ -1010,11 +1014,43 @@ public class SafeCheckController {
 			SMSNoticesService smsNoticesService = new SMSNoticesService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> smsNoticesList = smsNoticesService.getSMSNoticesByAreaCodeAndSmsDiv(areaCode, smsDiv);
 			smsNoticesService.close();
+			applySmsUrlPlaceholders(smsNoticesList, optContFileUrl, optPreviewUrl);
 			resultData = smsNoticesList; //.get(0).get("SMS_Msg");
 		}
 
 		RestAPIResult apiResult = new RestAPIResult(result, resultCode, resultData);
 		return apiResult;
+	}
+
+	private void applySmsUrlPlaceholders(
+			Map<String, Object> smsNoticesList,
+			Optional<String> optContFileUrl,
+			Optional<String> optPreviewUrl) {
+		if (smsNoticesList == null) return;
+		Object smsObj = smsNoticesList.get("SMS_Msg");
+		if (!(smsObj instanceof String)) return;
+
+		String smsMsg = (String) smsObj;
+		String contFileUrl = optContFileUrl.orElse("").trim();
+		String previewUrl = optPreviewUrl.orElse("").trim();
+
+		if (previewUrl.isEmpty() && !contFileUrl.isEmpty()) {
+			previewUrl = "https://docs.google.com/gview?embedded=true&url="
+					+ URLEncoder.encode(contFileUrl, StandardCharsets.UTF_8);
+		}
+
+		smsMsg = smsMsg
+				.replace("{CONT_FILE_URL}", contFileUrl)
+				.replace("{PDF_URL}", contFileUrl)
+				.replace("{DOWNLOAD_URL}", contFileUrl)
+				.replace("{계약서URL}", contFileUrl)
+				.replace("{계약서링크}", contFileUrl)
+				.replace("{계약서다운로드링크}", contFileUrl)
+				.replace("{다운로드링크}", contFileUrl)
+				.replace("{앱없이보기}", previewUrl)
+				.replace("{미리보기링크}", previewUrl);
+
+		smsNoticesList.put("SMS_Msg", smsMsg);
 	}
 
 	/*
