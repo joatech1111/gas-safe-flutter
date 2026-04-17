@@ -1,0 +1,21 @@
+gasmax:
+  session:
+    timeout: 43200
+  redis:
+    host: 127.0.0.1
+    portnumber: 6379
+    database: 2
+  datasource:
+    #host: 121.254.173.234
+    #host: 121.254.173.234
+    #host: 121.254.173.224
+
+    ########### 운영 외부 ip ############
+    host: joatech2.dyndns.org
+    ########### 운영 내부 ip ############
+    #host: 192.168.100.138
+    ##################################
+    portnumber: 2521
+    database: GasMax_App
+    username: GasMax_APP
+    password: GasMax_App_Pass

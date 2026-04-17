@@ -1,0 +1,13 @@
+server:
+  address: 0.0.0.0
+  port: 8000
+  ssl:
+    enabled: false
+    key-store: D:\work\sscp-https-root-cert.p12
+    key-store-password: sscp-wms-platform
+    key-store-type: PKCS12
+    key-alias: specs-sscp
+logging:
+  config: classpath:config/logback-api-dev.xml
+gas-max:
+  session-timeout: 6h

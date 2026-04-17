@@ -9,6 +9,7 @@ import '../../network/net_helper.dart';
 import '../../utils/app_state.dart';
 import '../../utils/date_util.dart';
 import '../../utils/keys.dart';
+import '../../widgets/common_widgets.dart';
 import '../../widgets/signature_pad.dart';
 
 class SafetyContractTab extends StatefulWidget {
@@ -28,6 +29,10 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
   String? _anzSno;
   String? _pdfFileUrl;
   bool _contractContentExpanded = true;
+  bool _supplierEquipExpanded = true;
+  bool _complaintCenterExpanded = true;
+  bool _supplierExpanded = true;
+  bool _customerExpanded = true;
 
   String? _signatureCustomer;
   String? _signatureSupplier;
@@ -46,10 +51,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
   final _custComNoController = TextEditingController();
   final _custComNameController = TextEditingController();
   final _custTelController = TextEditingController();
-  final _cuAddr1Controller = TextEditingController();
-  final _cuAddr2Controller = TextEditingController();
   final _cuGongNameController = TextEditingController();
-  final _cuGongNoController = TextEditingController();
   final _anzCuConfirmTelController = TextEditingController();
 
   // 공급자 소유 설비
@@ -73,7 +75,15 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
 
   String _saleType = '';
   String _contType = '';
+  int _contractPeriodIndex = 0; // 계약기간 스피너 (0=1년, 1=2년, ...)
   bool _loaded = false;
+
+  // 저장 시 사용할 주소/공급관리번호 (UI에 표시하지 않지만 데이터 유지)
+  String _cuAddr1 = '';
+  String _cuAddr2 = '';
+  String _cuGongNo = '';
+
+  static const _contractPeriodOptions = ['1년', '2년', '3년', '4년', '5년'];
 
   @override
   bool get wantKeepAlive => true;
@@ -148,10 +158,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     _custComNoController.text = d.custComNo ?? '';
     _custComNameController.text = d.custComName ?? '';
     _custTelController.text = d.custTel ?? '';
-    _cuAddr1Controller.text = d.cuAddr1 ?? '';
-    _cuAddr2Controller.text = d.cuAddr2 ?? '';
     _cuGongNameController.text = d.cuGongName ?? '';
-    _cuGongNoController.text = d.cuGongNo ?? '';
     _anzCuConfirmTelController.text = d.anzCuConfirmTel ?? '';
     _cylController.text = d.useCyl ?? '';
     _cylMemoController.text = d.useCylMemo ?? '';
@@ -170,16 +177,19 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     _centerGasController.text = d.centerGas ?? '';
     _saleType = d.saleType ?? '';
     _contType = d.contType ?? '';
+    _cuAddr1 = d.cuAddr1 ?? '';
+    _cuAddr2 = d.cuAddr2 ?? '';
+    _cuGongNo = d.cuGongNo ?? '';
   }
 
   void _setDefaults() {
     _anzDateController.text = DateUtil.toDisplay(DateUtil.today());
     _anzDateFController.text = DateUtil.toDisplay(DateUtil.today());
     _anzDateTController.text = DateUtil.toDisplay(DateUtil.afterDays(365));
-    _cuAddr1Controller.text = widget.customer.cuAddr1 ?? '';
-    _cuAddr2Controller.text = widget.customer.cuAddr2 ?? '';
+    _cuAddr1 = widget.customer.cuAddr1 ?? '';
+    _cuAddr2 = widget.customer.cuAddr2 ?? '';
+    _cuGongNo = widget.customer.cuGongNo ?? '';
     _cuGongNameController.text = widget.customer.cuGongName ?? '';
-    _cuGongNoController.text = widget.customer.cuGongNo ?? '';
     _custTelController.text = widget.customer.cuTel ?? '';
     _anzCuConfirmTelController.text = widget.customer.cuHp ?? '';
   }
@@ -188,6 +198,21 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     final converted = DateUtil.fromDisplay(displayDate);
     if (converted.isEmpty || converted.length < 8) return fallback;
     return converted;
+  }
+
+  /// 계약기간 스피너 변경 시 종료일 자동 계산
+  void _onContractPeriodChanged(int index) {
+    setState(() => _contractPeriodIndex = index);
+    final startText = _anzDateFController.text;
+    if (startText.isEmpty) return;
+    try {
+      final parts = startText.split('-');
+      if (parts.length != 3) return;
+      final startDate = DateTime(int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
+      final years = index + 1;
+      final endDate = DateTime(startDate.year + years, startDate.month, startDate.day);
+      _anzDateTController.text = '${endDate.year}-${endDate.month.toString().padLeft(2, '0')}-${endDate.day.toString().padLeft(2, '0')}';
+    } catch (_) {}
   }
 
   Future<void> _save({bool sendSMS = false}) async {
@@ -231,11 +256,11 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       'COM_HP': _comHpController.text,
       'COM_CEO_NAME': _comCeoNameController.text,
       'COM_SIGN_YN': comSign.isNotEmpty ? Keys.y : Keys.n,
-      'CU_GONGNO': _cuGongNoController.text,
+      'CU_GONGNO': _cuGongNo.isNotEmpty ? _cuGongNo : _contractNoController.text,
       'CUST_COM_NO': _custComNoController.text,
       'CUST_COM_NAME': _custComNameController.text,
-      'CU_ADDR1': _cuAddr1Controller.text,
-      'CU_ADDR2': _cuAddr2Controller.text,
+      'CU_ADDR1': _cuAddr1,
+      'CU_ADDR2': _cuAddr2,
       'CUST_TEL': _custTelController.text,
       'CU_GONGNAME': _cuGongNameController.text,
       'CUST_SIGN': custSign.isNotEmpty ? Keys.y : Keys.n,
@@ -284,7 +309,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
         .replaceAll('{거래처명}', widget.customer.cuNameView ?? widget.customer.cuName ?? '')
         .replaceAll('{영업소코드}', areaCode)
         .replaceAll('{거래처코드}', widget.customer.cuCode ?? '')
-        .replaceAll('{주소}', '${_cuAddr1Controller.text} ${_cuAddr2Controller.text}')
+        .replaceAll('{주소}', '$_cuAddr1 $_cuAddr2')
         .replaceAll('{계약일}', _anzDateController.text)
         .replaceAll('{점검자}', AppState.safeSwName);
     if (_pdfFileUrl != null && _pdfFileUrl!.isNotEmpty) {
@@ -295,29 +320,6 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     if (tel.isEmpty) { Fluttertoast.showToast(msg: '확인 연락처를 입력해주세요.'); return; }
     final uri = Uri(scheme: 'sms', path: tel, queryParameters: {'body': smsMsg});
     if (await canLaunchUrl(uri)) { await launchUrl(uri); }
-  }
-
-  Future<void> _delete() async {
-    if (_isNew || _anzSno == null) return;
-    final ok = await showDialog<bool>(context: context, builder: (ctx) => AlertDialog(
-      title: const Text('삭제'), content: const Text('삭제하시겠습니까?'),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
-        TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('삭제', style: TextStyle(color: Colors.red))),
-      ],
-    ));
-    if (ok != true || !mounted) return;
-    final resp = await NetHelper.request(context, () => NetHelper.api.safetyCheckContractDelete({
-      'AREA_CODE': widget.customer.areaCode ?? AppState.areaCode,
-      'ANZ_Cu_Code': widget.customer.cuCode, 'ANZ_Sno': _anzSno,
-    }));
-    if (!mounted) return;
-    if (NetHelper.isSuccess(resp)) {
-      Fluttertoast.showToast(msg: '삭제되었습니다.');
-      _isNew = true; _anzSno = null; _data = null; _pdfFileUrl = null;
-      _signatureCustomer = null; _signatureSupplier = null;
-      _setDefaults(); setState(() {});
-    } else { NetHelper.handleError(context, resp); }
   }
 
   void _showSignatureDialog({required String title, required String? initial, required ValueChanged<String?> onSave}) {
@@ -348,7 +350,6 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
 
     return Column(
       children: [
-        // 타이틀
         Container(
           padding: const EdgeInsets.symmetric(vertical: 10),
           child: const Text('공급계약', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
@@ -357,28 +358,26 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
           child: SingleChildScrollView(
             child: Column(
               children: [
-                // 고객정보 카드
                 _buildCustomerCard(),
                 const SizedBox(height: 8),
-                // 기본 정보
                 _buildBaseInfo(),
                 const SizedBox(height: 8),
-                // 공급계약 내용 토글
                 _buildContractContentToggle(),
                 const SizedBox(height: 8),
-                // 공급자 소유 설비
                 _buildSupplierEquipSection(),
                 const SizedBox(height: 8),
-                // 소비자 불만신고 센터
                 _buildComplaintCenterSection(),
                 const SizedBox(height: 8),
-                // 공급자 정보
                 _buildSupplierSection(),
                 const SizedBox(height: 8),
-                // 소비자 정보
-                _buildConsumerSection(),
+                _buildCustomerSection(),
+                const SizedBox(height: 8),
+                // SMS번호 (고객 섹션 바깥 - Kotlin과 동일)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: _fieldRow('SMS번호', Expanded(child: _miniInput(_anzCuConfirmTelController, type: TextInputType.phone))),
+                ),
                 const SizedBox(height: 16),
-                // 저장 버튼
                 _buildActionButtons(),
                 const SizedBox(height: 20),
               ],
@@ -389,6 +388,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     );
   }
 
+  /// 고객 정보 카드 - Kotlin과 동일 (이름, 주소+GPS, 전화, 담당사원)
   Widget _buildCustomerCard() {
     final c = widget.customer;
     return Container(
@@ -406,6 +406,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
           Row(children: [
             Icon(Icons.person_outline, size: 16, color: Colors.grey.shade600),
             const SizedBox(width: 8),
+            Expanded(child: Text(c.cuAddr ?? '${c.cuAddr1 ?? ''} ${c.cuAddr2 ?? ''}'.trim(), style: const TextStyle(fontSize: 13))),
           ]),
           const SizedBox(height: 4),
           Row(children: [
@@ -424,6 +425,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     );
   }
 
+  /// 기본 정보 - Kotlin과 동일 (계약번호, 계약일자, 계약기간 스피너, 계약기간 날짜, 판매방법, 거래현황)
   Widget _buildBaseInfo() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -432,12 +434,27 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
           // 계약번호
           _fieldRow('계약번호', SizedBox(width: 100, child: _miniInput(_contractNoController)), isLabel: true, labelColor: Colors.orange.shade800),
           const SizedBox(height: 8),
-          // 계약일자
-          _fieldRow('계약일자', Row(children: [
-            SizedBox(width: 100, child: _dateInput(_anzDateController)),
-          ])),
+          // 계약일자 + 계약기간 스피너 (신규일 때만 표시 - Kotlin과 동일)
+          Row(
+            children: [
+              const SizedBox(width: 70, child: Text('계약일자', style: TextStyle(fontSize: 13, color: Colors.black87))),
+              SizedBox(width: 100, child: _dateInput(_anzDateController)),
+              if (_isNew || _anzSno == null) ...[
+                const SizedBox(width: 12),
+                const Text('계약기간', style: TextStyle(fontSize: 13, color: Colors.black87)),
+                const SizedBox(width: 8),
+                _miniDropdown(
+                  value: _contractPeriodOptions[_contractPeriodIndex],
+                  items: _contractPeriodOptions.map((e) => DropdownMenuItem(value: e, child: Text(e, style: const TextStyle(fontSize: 13)))).toList(),
+                  onChanged: (v) {
+                    if (v != null) _onContractPeriodChanged(_contractPeriodOptions.indexOf(v));
+                  },
+                ),
+              ],
+            ],
+          ),
           const SizedBox(height: 8),
-          // 계약기간
+          // 계약기간 날짜
           _fieldRow('계약기간', Row(children: [
             SizedBox(width: 100, child: _dateInput(_anzDateFController)),
             const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('~')),
@@ -477,12 +494,13 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     );
   }
 
-  Widget _miniInput(TextEditingController ctrl) {
+  Widget _miniInput(TextEditingController ctrl, {TextInputType type = TextInputType.text}) {
     return Container(
       height: 32,
       decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
       child: TextField(
         controller: ctrl,
+        keyboardType: type,
         decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8), isDense: true),
         style: const TextStyle(fontSize: 13),
       ),
@@ -513,6 +531,8 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       ),
     );
   }
+
+  // ── 공급계약 내용 (11개 항목) ──
 
   static const _contractTitles = [
     '가스의 전달방법',
@@ -564,76 +584,62 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     );
   }
 
-  // 공급계약 내용 토글
+  // ── 공급계약 내용 토글 ──
   Widget _buildContractContentToggle() {
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 10),
+    return _buildToggleSection(
+      title: '공급계약 내용',
+      isExpanded: _contractContentExpanded,
+      onToggle: () => setState(() => _contractContentExpanded = !_contractContentExpanded),
+      headerColor: Colors.black87,
+      headerTextColor: Colors.white,
       child: Column(
-        children: [
-          // 헤더 (검정 배경)
-          GestureDetector(
-            onTap: () => setState(() => _contractContentExpanded = !_contractContentExpanded),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: BorderRadius.vertical(top: const Radius.circular(4), bottom: Radius.circular(_contractContentExpanded ? 0 : 4)),
-              ),
-              child: Row(
-                children: [
-                  const Expanded(child: Text('공급계약 내용', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Colors.white))),
-                  Icon(_contractContentExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: Colors.white, size: 20),
-                ],
-              ),
-            ),
+        children: List.generate(_contractTitles.length, (i) => Container(
+          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
+          child: ListTile(
+            dense: true,
+            visualDensity: VisualDensity.compact,
+            title: Text(_contractTitles[i], style: const TextStyle(fontSize: 13)),
+            trailing: Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade500),
+            onTap: () => _showContractDetailPopup(i),
           ),
-          // 아이템
-          if (_contractContentExpanded)
-            Container(
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade300),
-                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(4)),
-              ),
-              child: Column(
-                children: List.generate(_contractTitles.length, (i) => Container(
-                  decoration: BoxDecoration(border: Border(bottom: BorderSide(color: Colors.grey.shade200))),
-                  child: ListTile(
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                    title: Text(_contractTitles[i], style: const TextStyle(fontSize: 13)),
-                    trailing: Icon(Icons.chevron_right, size: 18, color: Colors.grey.shade500),
-                    onTap: () => _showContractDetailPopup(i),
-                  ),
-                )),
-              ),
-            ),
-        ],
+        )),
       ),
     );
   }
 
+  // ── 공급자 소유 설비 ──
   Widget _buildSupplierEquipSection() {
-    return _expandableSection('공급자 소유 설비', [
-      _equipRow('용기', _cylController, _cylMemoController),
-      _equipRow('계량기', _meterController, _meterMemoController),
-      _equipRow('절체기', _transController, _transMemoController),
-      _equipRow('기화기', _vaporController, _vaporMemoController),
-      _equipRow('공급관', _pipeController, _pipeMemoController),
-      const SizedBox(height: 6),
-      const Text('부속설비', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
-      const SizedBox(height: 4),
-      Container(
-        height: 60,
-        decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
-        child: TextField(
-          controller: _facilityController,
-          maxLines: 3,
-          decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.all(8), isDense: true),
-          style: const TextStyle(fontSize: 12),
+    return _buildToggleSection(
+      title: '공급자 소유 설비',
+      isExpanded: _supplierEquipExpanded,
+      onToggle: () => setState(() => _supplierEquipExpanded = !_supplierEquipExpanded),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _equipRow('용기', _cylController, _cylMemoController),
+            _equipRow('계량기', _meterController, _meterMemoController),
+            _equipRow('절체기', _transController, _transMemoController),
+            _equipRow('기화기', _vaporController, _vaporMemoController),
+            _equipRow('공급관', _pipeController, _pipeMemoController),
+            const SizedBox(height: 6),
+            const Text('부속설비', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+            const SizedBox(height: 4),
+            Container(
+              height: 60,
+              decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
+              child: TextField(
+                controller: _facilityController,
+                maxLines: 3,
+                decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.all(8), isDense: true),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ],
         ),
       ),
-    ]);
+    );
   }
 
   Widget _equipRow(String label, TextEditingController qtyCtrl, TextEditingController memoCtrl) {
@@ -669,72 +675,123 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     );
   }
 
+  // ── 소비자 불만신고 센터 ──
   Widget _buildComplaintCenterSection() {
-    return _expandableSection('소비자 불만신고 센터', [
-      _formField('시.군.구청', _centerSiController),
-      _formField('소비자단체', _centerConsumerController),
-      _formField('한국가스공사', _centerKgsController),
-      _formField('가스공급자단체', _centerGasController),
-    ]);
+    return _buildToggleSection(
+      title: '소비자 불만신고 센터',
+      isExpanded: _complaintCenterExpanded,
+      onToggle: () => setState(() => _complaintCenterExpanded = !_complaintCenterExpanded),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            _formField('시.군.구청', _centerSiController),
+            _formField('소비자단체', _centerConsumerController),
+            _formField('한국가스공사', _centerKgsController),
+            _formField('가스공급자단체', _centerGasController),
+          ],
+        ),
+      ),
+    );
   }
 
+  // ── 공급자 (Kotlin과 동일: 사업자번호, 상호, 전화, 긴급연락처, 대표자 + 서명) ──
   Widget _buildSupplierSection() {
     final hasSign = _signatureSupplier != null && _signatureSupplier!.isNotEmpty;
-    return _expandableSection('공급자 정보', [
-      _formField('사업자번호', _comNoController),
-      _formField('상호', _comNameController),
-      _formField('대표자', _comCeoNameController),
-      _formField('전화번호', _comTelController, type: TextInputType.phone),
-      _formField('휴대폰', _comHpController, type: TextInputType.phone),
-      const SizedBox(height: 8),
-      _signatureRow('공급자 서명', hasSign, () => _showSignatureDialog(
-        title: '공급자 서명', initial: _signatureSupplier,
-        onSave: (d) => setState(() => _signatureSupplier = d),
-      )),
-      if (hasSign) SignaturePad(key: _comSignKey, initialSignature: _signatureSupplier, canWrite: false),
-    ]);
+    return _buildToggleSection(
+      title: '공급자',
+      isExpanded: _supplierExpanded,
+      onToggle: () => setState(() => _supplierExpanded = !_supplierExpanded),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _formField('사업자번호', _comNoController),
+            _formField('상호', _comNameController),
+            _formField('전화', _comTelController, type: TextInputType.phone),
+            _formField('긴급연락처', _comHpController, type: TextInputType.phone),
+            _formField('대표자', _comCeoNameController),
+            const SizedBox(height: 8),
+            _signatureRow('대표자 서명', hasSign, () => _showSignatureDialog(
+              title: '공급자 서명', initial: _signatureSupplier,
+              onSave: (d) => setState(() => _signatureSupplier = d),
+            )),
+            if (hasSign) SignaturePad(key: _comSignKey, initialSignature: _signatureSupplier, canWrite: false),
+          ],
+        ),
+      ),
+    );
   }
 
-  Widget _buildConsumerSection() {
+  // ── 고객 (Kotlin과 동일: 사업자번호, 상호, 전화, 고객서명 + 서명) ──
+  Widget _buildCustomerSection() {
     final hasSign = _signatureCustomer != null && _signatureCustomer!.isNotEmpty;
-    return _expandableSection('소비자 정보', [
-      _formField('공급관리번호', _cuGongNoController),
-      _formField('사업자번호', _custComNoController),
-      _formField('상호(성명)', _custComNameController),
-      _formField('주소', _cuAddr1Controller),
-      _formField('상세주소', _cuAddr2Controller),
-      _formField('전화번호', _custTelController, type: TextInputType.phone),
-      _formField('공급시설명', _cuGongNameController),
-      _formField('확인 연락처', _anzCuConfirmTelController, type: TextInputType.phone),
-      const SizedBox(height: 8),
-      _signatureRow('소비자 서명', hasSign, () => _showSignatureDialog(
-        title: '소비자 서명', initial: _signatureCustomer,
-        onSave: (d) => setState(() => _signatureCustomer = d),
-      )),
-      if (hasSign) SignaturePad(key: _custSignKey, initialSignature: _signatureCustomer, canWrite: false),
-    ]);
+    return _buildToggleSection(
+      title: '고객',
+      isExpanded: _customerExpanded,
+      onToggle: () => setState(() => _customerExpanded = !_customerExpanded),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _formField('사업자번호', _custComNoController),
+            _formField('상호', _custComNameController),
+            _formField('전화', _custTelController, type: TextInputType.phone),
+            _formField('고객서명', _cuGongNameController),
+            const SizedBox(height: 8),
+            _signatureRow('고객 서명', hasSign, () => _showSignatureDialog(
+              title: '고객 서명', initial: _signatureCustomer,
+              onSave: (d) => setState(() => _signatureCustomer = d),
+            )),
+            if (hasSign) SignaturePad(key: _custSignKey, initialSignature: _signatureCustomer, canWrite: false),
+          ],
+        ),
+      ),
+    );
   }
 
-  Widget _expandableSection(String title, List<Widget> children) {
+  // ── 공통 토글 섹션 위젯 ──
+  Widget _buildToggleSection({
+    required String title,
+    required bool isExpanded,
+    required VoidCallback onToggle,
+    required Widget child,
+    Color headerColor = const Color(0xFFEEEEEE),
+    Color headerTextColor = Colors.black87,
+  }) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 10),
       child: Column(
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: const BorderRadius.vertical(top: Radius.circular(4))),
-            child: Row(children: [
-              Expanded(child: Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold))),
-            ]),
-          ),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade300),
-              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(4)),
+          GestureDetector(
+            onTap: onToggle,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: headerColor,
+                borderRadius: BorderRadius.vertical(
+                  top: const Radius.circular(4),
+                  bottom: Radius.circular(isExpanded ? 0 : 4),
+                ),
+              ),
+              child: Row(
+                children: [
+                  Expanded(child: Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: headerTextColor))),
+                  Icon(isExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, color: headerTextColor, size: 20),
+                ],
+              ),
             ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: children),
           ),
+          if (isExpanded)
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade300),
+                borderRadius: const BorderRadius.vertical(bottom: Radius.circular(4)),
+              ),
+              child: child,
+            ),
         ],
       ),
     );
@@ -776,7 +833,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(color: Colors.grey.shade800, borderRadius: BorderRadius.circular(4)),
-            child: Text(hasSign ? '재서명' : '서명', style: const TextStyle(fontSize: 11, color: Colors.white)),
+            child: Text(hasSign ? '확인' : '서명', style: const TextStyle(fontSize: 11, color: Colors.white)),
           ),
         ),
       ],
@@ -801,13 +858,6 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
               })),
             ],
           ),
-          if (!_isNew) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: _actionBtn('삭제', Colors.red, _delete),
-            ),
-          ],
         ],
       ),
     );
@@ -832,14 +882,22 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       onTap: onTap,
       child: Container(
         height: 44, alignment: Alignment.center,
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
-        child: Text(text, style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
+        decoration: BoxDecoration(
+          border: Border.all(color: color, width: 1.5),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(text, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.bold)),
       ),
     );
   }
 
   Future<void> _pickDate(TextEditingController controller) async {
-    final date = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2100));
+    final date = await CommonWidgets.showKoreanDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
     if (date != null) {
       controller.text = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
       setState(() {});
@@ -853,8 +911,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     _comNoController.dispose(); _comNameController.dispose(); _comTelController.dispose();
     _comHpController.dispose(); _comCeoNameController.dispose();
     _custComNoController.dispose(); _custComNameController.dispose(); _custTelController.dispose();
-    _cuAddr1Controller.dispose(); _cuAddr2Controller.dispose();
-    _cuGongNameController.dispose(); _cuGongNoController.dispose(); _anzCuConfirmTelController.dispose();
+    _cuGongNameController.dispose(); _anzCuConfirmTelController.dispose();
     _cylController.dispose(); _cylMemoController.dispose();
     _meterController.dispose(); _meterMemoController.dispose();
     _transController.dispose(); _transMemoController.dispose();

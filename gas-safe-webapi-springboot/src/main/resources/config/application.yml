@@ -1,0 +1,29 @@
+server:
+  compression:
+    enabled: true
+    mime-types: application/json
+    min-response-size: 1
+  http2:
+    enabled: true
+  tomcat:
+    accesslog:
+      enabled: true
+      pattern: "[%{yyyy-MM-dd HH:mm:ss}t]\t%a\t%{User-Agent}i\t%{Referer}i\t%s\t%r\t%b"
+      suffix: .log
+      prefix: access_
+      file-date-format: yyyy-MM-dd
+      directory: logs
+    basedir: .
+spring:
+  profiles:
+    active: dev
+  http:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  jackson:
+    mapper:
+      ACCEPT_CASE_INSENSITIVE_PROPERTIES: true
+gas-max:
+  session-timeout: 6h

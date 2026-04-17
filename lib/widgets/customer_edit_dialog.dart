@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
+import 'package:kpostal/kpostal.dart';
 import '../models/safety_customer_result_data.dart';
 import '../models/combo_data.dart';
 import '../network/net_helper.dart';
@@ -43,6 +44,18 @@ class CustomerEditDialog {
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx2, setDialogState) {
+            Future<void> searchAddress() async {
+              final Kpostal? addressData = await Navigator.push<Kpostal>(
+                ctx2,
+                MaterialPageRoute(builder: (_) => KpostalView()),
+              );
+              if (addressData == null) return;
+              setDialogState(() {
+                zipCtrl.text = addressData.postCode;
+                addr1Ctrl.text = addressData.address;
+              });
+            }
+
             return AlertDialog(
               title: Row(
                 children: [
@@ -71,8 +84,19 @@ class CustomerEditDialog {
                       _inputRow('대표자', userNameCtrl),
                       _inputRow('전화번호', telCtrl, type: TextInputType.phone),
                       _inputRow('휴대폰', hpCtrl, type: TextInputType.phone),
-                      _inputRow('우편번호', zipCtrl),
-                      _inputRow('주소', addr1Ctrl),
+                      _inputRow(
+                        '우편번호',
+                        zipCtrl,
+                        readOnly: true,
+                        actionLabel: '우편번호찾기',
+                        onActionTap: searchAddress,
+                      ),
+                      _inputRow(
+                        '주소',
+                        addr1Ctrl,
+                        readOnly: true,
+                        onTap: searchAddress,
+                      ),
                       _inputRow('상세주소', addr2Ctrl),
                       _inputRow('비고1', bigo1Ctrl),
                       _inputRow('비고2', bigo2Ctrl),
@@ -155,25 +179,59 @@ class CustomerEditDialog {
     return result;
   }
 
-  static Widget _inputRow(String label, TextEditingController ctrl, {TextInputType type = TextInputType.text}) {
+  static Widget _inputRow(
+    String label,
+    TextEditingController ctrl, {
+    TextInputType type = TextInputType.text,
+    bool readOnly = false,
+    VoidCallback? onTap,
+    String? actionLabel,
+    VoidCallback? onActionTap,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
           SizedBox(width: 75, child: Text(label, style: const TextStyle(fontSize: 12))),
           Expanded(
-            child: SizedBox(
-              height: 34,
-              child: TextField(
-                controller: ctrl,
-                keyboardType: type,
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                  isDense: true,
+            child: Row(
+              children: [
+                Expanded(
+                  child: SizedBox(
+                    height: 40,
+                    child: TextField(
+                      controller: ctrl,
+                      keyboardType: type,
+                      readOnly: readOnly,
+                      onTap: onTap,
+                      decoration: InputDecoration(
+                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+                        isDense: true,
+                      ),
+                      style: const TextStyle(fontSize: 13),
+                    ),
+                  ),
                 ),
-                style: const TextStyle(fontSize: 12),
-              ),
+                if (actionLabel != null && onActionTap != null) ...[
+                  const SizedBox(width: 6),
+                  SizedBox(
+                    height: 40,
+                    child: ElevatedButton(
+                      onPressed: onActionTap,
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 10),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        backgroundColor: const Color(0xFF777777),
+                      ),
+                      child: Text(
+                        actionLabel,
+                        style: const TextStyle(fontSize: 11, color: Colors.white),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -197,7 +255,7 @@ class CustomerEditDialog {
           SizedBox(width: 75, child: Text(label, style: const TextStyle(fontSize: 12))),
           Expanded(
             child: Container(
-              height: 34,
+              height: 40,
               padding: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey.shade400),

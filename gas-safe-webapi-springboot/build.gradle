@@ -1,0 +1,77 @@
+plugins {
+	id 'org.springframework.boot' version '2.1.9.RELEASE'
+	id 'io.spring.dependency-management' version '1.0.8.RELEASE'
+	id 'java'
+	id 'eclipse'
+}
+
+group = 'com.joatech.gasmax'
+version = '2.0.0'
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+configurations {
+	developmentOnly
+	runtimeClasspath {
+		extendsFrom developmentOnly
+	}
+	compileOnly {
+		extendsFrom annotationProcessor
+	}
+}
+
+repositories {
+	jcenter()
+	mavenCentral()
+	maven {
+		url 'https://repo.spring.io/libs-milestone'
+	}
+}
+
+ext['jackson.version'] = '2.9.7'
+ext['tomcat.version'] = '9.0.24'
+
+dependencies {
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+
+	implementation 'org.springframework.boot:spring-boot-starter-web'
+	implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+	implementation 'org.springframework.boot:spring-boot-starter-data-rest'
+	implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+	implementation 'net.sourceforge.jtds:jtds'
+	implementation 'com.google.code.findbugs:jsr305:3.0.2'
+
+	// ✅ SnakeYAML 1.23 고정 (Spring Boot 2.1.9 호환)
+	implementation 'org.yaml:snakeyaml:1.23'
+
+	// ====================================================================================================
+	// HTML TO PDF LIBRARY
+	implementation 'com.itextpdf:itextpdf:5.5.13.3'
+	implementation 'com.itextpdf.tool:xmlworker:5.5.13.3'
+	implementation 'com.itextpdf:pdfa:7.2.3'
+	// ====================================================================================================
+
+	compileOnly 'org.projectlombok:lombok'
+	developmentOnly 'org.springframework.boot:spring-boot-devtools'
+	runtimeOnly 'com.microsoft.sqlserver:mssql-jdbc'
+	annotationProcessor 'org.projectlombok:lombok'
+	testImplementation 'org.springframework.boot:spring-boot-starter-test'
+}
+
+
+// 리소스 경로 명시 (기본적으로 작동하지만, 문제 방지를 위해 명시적 지정)
+sourceSets {
+	main {
+		resources {
+			srcDirs = ['src/main/resources']
+			// filter나 include 사용 시 여기 추가 가능
+		}
+	}
+}
+
+// 빌드시 리소스 처리 확인용 로그
+tasks.named('processResources') {
+	doLast {
+		println "✅ Resources processed and included in the JAR."
+	}
+}

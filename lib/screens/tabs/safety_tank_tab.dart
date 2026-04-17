@@ -1,14 +1,18 @@
+import 'dart:convert';
 import '../../widgets/logo_loader.dart';
+import '../../widgets/signature_pad.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../models/combo_data.dart';
 import '../../models/safety_customer_result_data.dart';
 import '../../models/safety_tank_result_data.dart';
 import '../../network/net_helper.dart';
 import '../../utils/app_state.dart';
 import '../../utils/date_util.dart';
 import '../../utils/keys.dart';
+import '../../widgets/common_widgets.dart';
 
 class SafetyTankTab extends StatefulWidget {
   final SafetyCustomerResultData customer;
@@ -32,10 +36,22 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
   final _bigo1Controller = TextEditingController();
   final _bigo2Controller = TextEditingController();
   final _anzCuConfirmTelController = TextEditingController();
+  final _anzCustNameController = TextEditingController();
+
+  // Editable labels for items 10-12
+  final _checkItem10Controller = TextEditingController(text: '발신기 작동 여부');
+  final _checkItem11Controller = TextEditingController(text: '');
+  final _checkItem12Controller = TextEditingController(text: '');
 
   final Map<String, String> _tankItems = {};
-  final Map<String, String> _tankBigos = {};
   final Map<String, TextEditingController> _bigoControllers = {};
+
+  // Employee dropdown
+  ComboData? _selectedSw;
+
+  // Signature
+  String? _signatureBase64;
+  final GlobalKey<SignaturePadState> _signatureKey = GlobalKey<SignaturePadState>();
 
   bool _loaded = false;
 
@@ -49,6 +65,16 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
     for (int i = 1; i <= 12; i++) {
       final key = i.toString().padLeft(2, '0');
       _bigoControllers['ANZ_TANK_${key}_Bigo'] = TextEditingController();
+    }
+    // Initialize employee dropdown
+    _initSelectedSw();
+  }
+
+  void _initSelectedSw() {
+    final swList = AppState.comboSw;
+    if (swList.isNotEmpty) {
+      final match = swList.where((e) => e.cd == AppState.safeSwCode).toList();
+      _selectedSw = match.isNotEmpty ? match.first : swList.first;
     }
   }
 
@@ -108,6 +134,20 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
     _bigo1Controller.text = d.anzTankSwBigo1 ?? '';
     _bigo2Controller.text = d.anzTankSwBigo2 ?? '';
     _anzCuConfirmTelController.text = d.anzCuConfirmTel ?? '';
+    _anzCustNameController.text = d.anzCustName ?? '';
+    _signatureBase64 = null; // Will be loaded if needed
+
+    // Set employee dropdown from loaded data
+    if (d.anzSwCode != null && d.anzSwCode!.isNotEmpty) {
+      final swList = AppState.comboSw;
+      final match = swList.where((e) => e.cd == d.anzSwCode).toList();
+      if (match.isNotEmpty) _selectedSw = match.first;
+    }
+
+    // Editable labels for items 10-12
+    _checkItem10Controller.text = (d.anzCheckItem10 != null && d.anzCheckItem10!.isNotEmpty) ? d.anzCheckItem10! : '발신기 작동 여부';
+    _checkItem11Controller.text = (d.anzCheckItem11 != null && d.anzCheckItem11!.isNotEmpty) ? d.anzCheckItem11! : '';
+    _checkItem12Controller.text = (d.anzCheckItem12 != null && d.anzCheckItem12!.isNotEmpty) ? d.anzCheckItem12! : '';
 
     final items = [d.anzTank01, d.anzTank02, d.anzTank03, d.anzTank04, d.anzTank05,
       d.anzTank06, d.anzTank07, d.anzTank08, d.anzTank09, d.anzTank10, d.anzTank11, d.anzTank12];
@@ -119,36 +159,60 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
       _tankItems['ANZ_TANK_$key'] = items[i] ?? '';
       _bigoControllers['ANZ_TANK_${key}_Bigo']!.text = bigos[i] ?? '';
     }
+
+    // Sign YN
+    if (d.anzSignYN == 'Y') {
+      // Signature was previously saved; we don't have the image data from load
+      // but we note that it exists
+    }
   }
 
   void _setDefaults() {
     _anzDateController.text = DateUtil.toDisplay(DateUtil.today());
     _anzCuConfirmTelController.text = widget.customer.cuHp ?? '';
+    _anzCustNameController.text = widget.customer.cuName ?? '';
   }
 
   Future<void> _save({bool sendSMS = false}) async {
     Position? pos;
     try { pos = await Geolocator.getCurrentPosition(); } catch (_) {}
 
+    // Get signature base64
+    String signBase64 = '';
+    String signYN = 'N';
+    if (_signatureKey.currentState != null && !_signatureKey.currentState!.isEmpty) {
+      final sig = await _signatureKey.currentState!.toBase64();
+      if (sig != null && sig.isNotEmpty) {
+        signBase64 = sig;
+        signYN = 'Y';
+      }
+    } else if (_signatureBase64 != null && _signatureBase64!.isNotEmpty) {
+      signBase64 = _signatureBase64!;
+      signYN = 'Y';
+    }
+
+    final swCode = _selectedSw?.cd ?? AppState.safeSwCode;
+    final swName = _selectedSw?.getCdName() ?? AppState.safeSwName;
+
     final req = <String, dynamic>{
       'AREA_CODE': widget.customer.areaCode ?? AppState.areaCode,
       'ANZ_Cu_Code': widget.customer.cuCode,
       'ANZ_Sno': _isNew ? '' : (_anzSno ?? ''),
       'ANZ_Date': DateUtil.fromDisplay(_anzDateController.text),
-      'ANZ_SW_Code': AppState.safeSwCode,
-      'ANZ_SW_Name': AppState.safeSwName,
+      'ANZ_SW_Code': swCode,
+      'ANZ_SW_Name': swName,
       'ANZ_TANK_KG_01': _tankKg01Controller.text,
       'ANZ_TANK_KG_02': _tankKg02Controller.text,
       'ANZ_TANK_SW_Bigo1': _bigo1Controller.text,
       'ANZ_TANK_SW_Bigo2': _bigo2Controller.text,
-      'ANZ_CustName': widget.customer.cuName ?? '',
-      'ANZ_Sign_YN': '',
+      'ANZ_CustName': _anzCustNameController.text,
+      'ANZ_Sign_YN': signYN,
       'ANZ_CU_Confirm_TEL': _anzCuConfirmTelController.text,
       'ANZ_CU_SMS_YN': sendSMS ? 'Y' : 'N',
       'GPS_X': pos?.longitude.toString() ?? '',
       'GPS_Y': pos?.latitude.toString() ?? '',
       'ANZ_User_ID': AppState.loginUserId,
-      'ANZ_Sign': '',
+      'ANZ_Sign': signBase64,
     };
 
     for (int i = 1; i <= 12; i++) {
@@ -156,9 +220,9 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
       req['ANZ_TANK_$key'] = _tankItems['ANZ_TANK_$key'] ?? '';
       req['ANZ_TANK_${key}_Bigo'] = _bigoControllers['ANZ_TANK_${key}_Bigo']!.text;
     }
-    req['ANZ_Check_item_10'] = '';
-    req['ANZ_Check_item_11'] = '';
-    req['ANZ_Check_item_12'] = '';
+    req['ANZ_Check_item_10'] = _checkItem10Controller.text;
+    req['ANZ_Check_item_11'] = _checkItem11Controller.text;
+    req['ANZ_Check_item_12'] = _checkItem12Controller.text;
 
     if (!mounted) return;
     final resp = await NetHelper.request(
@@ -195,13 +259,15 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
       if (entry.value == Keys.tankFailed) { result = '부적합'; break; }
     }
 
+    final swName = _selectedSw?.getCdName() ?? AppState.safeSwName;
+
     smsMsg = smsMsg
         .replaceAll('{거래처명}', widget.customer.cuNameView ?? widget.customer.cuName ?? '')
         .replaceAll('{영업소코드}', areaCode)
         .replaceAll('{거래처코드}', widget.customer.cuCode ?? '')
         .replaceAll('{주소}', '${widget.customer.cuAddr1 ?? ''} ${widget.customer.cuAddr2 ?? ''}')
         .replaceAll('{점검일}', _anzDateController.text)
-        .replaceAll('{점검원}', AppState.safeSwName)
+        .replaceAll('{점검원}', swName)
         .replaceAll('{점검결과}', result);
 
     final tel = _anzCuConfirmTelController.text.trim().replaceAll('-', '');
@@ -210,52 +276,72 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
     if (await canLaunchUrl(uri)) { await launchUrl(uri); }
   }
 
-  Future<void> _delete() async {
-    if (_isNew || _anzSno == null) return;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('삭제'), content: const Text('삭제하시겠습니까?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('취소')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('삭제', style: TextStyle(color: Colors.red))),
-        ],
-      ),
-    );
-    if (confirm != true || !mounted) return;
-
-    final req = {
-      'AREA_CODE': widget.customer.areaCode ?? AppState.areaCode,
-      'ANZ_Cu_Code': widget.customer.cuCode,
-      'ANZ_Sno': _anzSno,
-    };
-    final resp = await NetHelper.request(context, () => NetHelper.api.safetyTankDelete(req));
-    if (!mounted) return;
-    if (NetHelper.isSuccess(resp)) {
-      Fluttertoast.showToast(msg: '삭제되었습니다.');
-      _isNew = true; _anzSno = null; _data = null;
-      _tankItems.clear();
-      _setDefaults();
-      setState(() {});
-    } else {
-      NetHelper.handleError(context, resp);
-    }
-  }
+  // Result dropdown values matching Kotlin spinner_default_check_result
+  static const _resultOptions = [
+    MapEntry('', '선택'),       // index 0 - empty
+    MapEntry('1', '적합'),      // index 1
+    MapEntry('2', '부적합'),    // index 2
+  ];
 
   static const _tankLabels = [
-    '1. 저장탱크 외면상태',
-    '2. 저장탱크 기초 침하상태',
-    '3. 사고예방 장치 설치 및 적합성',
-    '4. 안전밸브 설치 및 적합성',
-    '5. 액면계 설치 및 기능',
-    '6. 압력계 설치 및 기능',
-    '7. 가스누출 검지(경보) 장치',
-    '8. 방류둑 설치 및 적합성',
-    '9. 살수장치 작동',
-    '10. 기타항목1',
-    '11. 기타항목2',
-    '12. 기타항목3',
+    '1. 저장탱크 경계표시 및 도색',
+    '2. 저장탱크 화기와의 거리',
+    '3. 가스누설경보기 설치 및 상태',
+    '4. 배관의 도색, 고정, 표시 상태',
+    '5. 안전밸브의 설치 및 작동 상태',
+    '6. 정기검사 실시 여부',
+    '7. 안전관리자 선임 여부',
+    '8. 손해배상 보험가입 여부',
+    '9. 소화기 비치 여부 및 개수',
   ];
+
+  void _openSignatureDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) {
+        final sigKey = GlobalKey<SignaturePadState>();
+        return AlertDialog(
+          title: const Text('서명', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          content: SizedBox(
+            width: 320,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                SignaturePad(key: sigKey, initialSignature: _signatureBase64, canWrite: true),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => sigKey.currentState?.clear(),
+                      child: const Text('지우기', style: TextStyle(fontSize: 14)),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('취소', style: TextStyle(fontSize: 14)),
+            ),
+            TextButton(
+              onPressed: () async {
+                final base64 = await sigKey.currentState?.toBase64();
+                setState(() {
+                  _signatureBase64 = base64;
+                });
+                if (ctx.mounted) Navigator.pop(ctx);
+              },
+              child: const Text('확인', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -282,32 +368,22 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
                 const SizedBox(height: 8),
                 _sectionTitle('기본정보'),
                 _textField('점검일자', _anzDateController, readOnly: true, onTap: () => _pickDate(_anzDateController)),
-                _textField('탱크용량(kg)1', _tankKg01Controller, keyboardType: TextInputType.number),
-                _textField('탱크용량(kg)2', _tankKg02Controller, keyboardType: TextInputType.number),
-                _textField('확인 연락처', _anzCuConfirmTelController, keyboardType: TextInputType.phone),
+                _buildSwDropdownRow(),
+                const SizedBox(height: 4),
+                _buildStorageRow(),
                 const Divider(),
                 _sectionTitle('점검항목'),
-                for (int i = 0; i < 12; i++) ...[
-                  _checkRow(_tankLabels[i], 'ANZ_TANK_${(i + 1).toString().padLeft(2, '0')}'),
-                  Padding(
-                    padding: const EdgeInsets.only(left: 16, bottom: 4),
-                    child: SizedBox(
-                      height: 30,
-                      child: TextField(
-                        controller: _bigoControllers['ANZ_TANK_${(i + 1).toString().padLeft(2, '0')}_Bigo'],
-                        decoration: InputDecoration(
-                          hintText: '비고', hintStyle: const TextStyle(fontSize: 11),
-                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 8), isDense: true,
-                        ),
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                    ),
-                  ),
-                ],
+                _buildCheckTable(),
                 const Divider(),
-                _textField('점검자 의견1', _bigo1Controller),
-                _textField('점검자 의견2', _bigo2Controller),
+                _sectionTitle('점검자 의견'),
+                _textField('의견1', _bigo1Controller),
+                _textField('의견2', _bigo2Controller),
+                const Divider(),
+                _sectionTitle('확인자 정보'),
+                _textField('확인자명', _anzCustNameController),
+                _textField('SMS번호', _anzCuConfirmTelController, keyboardType: TextInputType.phone),
+                const SizedBox(height: 8),
+                _buildSignatureSection(),
                 const SizedBox(height: 20),
               ],
             ),
@@ -319,6 +395,9 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
   }
 
   Widget _buildCustomerCard() {
+    final typeName = widget.customer.cuTypeName ?? widget.customer.cuCuTypeName ?? '';
+    final displayName = widget.customer.cuNameView ?? widget.customer.cuName ?? '';
+    final tel = widget.customer.cuTel ?? '';
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
@@ -328,17 +407,31 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(children: [
-            const Icon(Icons.person, size: 14, color: Colors.black54),
-            const SizedBox(width: 4),
-            Expanded(child: Text(widget.customer.cuName ?? '', style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
-          ]),
-          const SizedBox(height: 4),
-          Row(children: [
-            const Icon(Icons.phone, size: 13, color: Colors.black45),
-            const SizedBox(width: 4),
-            Text(widget.customer.cuTel ?? '', style: const TextStyle(fontSize: 12, color: Colors.black54)),
-          ]),
+          Row(
+            children: [
+              if (typeName.isNotEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5B9BD5),
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  child: Text(typeName, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(width: 8),
+              ],
+              Expanded(child: Text(displayName, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold))),
+            ],
+          ),
+          if (tel.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Row(children: [
+              const Icon(Icons.phone, size: 13, color: Colors.black45),
+              const SizedBox(width: 4),
+              Text(tel, style: const TextStyle(fontSize: 12, color: Colors.black54)),
+            ]),
+          ],
+          const SizedBox(height: 2),
           Row(children: [
             const Icon(Icons.location_on, size: 13, color: Colors.black45),
             const SizedBox(width: 4),
@@ -350,32 +443,317 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
     );
   }
 
+  Widget _buildSwDropdownRow() {
+    final swList = AppState.comboSw;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          const SizedBox(width: 100, child: Text('점검사원', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+          Expanded(
+            child: Container(
+              height: 36,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<ComboData>(
+                  value: _selectedSw,
+                  isExpanded: true,
+                  isDense: true,
+                  style: const TextStyle(fontSize: 13, color: Colors.black87),
+                  items: swList.map((e) => DropdownMenuItem<ComboData>(
+                    value: e,
+                    child: Text(e.getCdName(), style: const TextStyle(fontSize: 13)),
+                  )).toList(),
+                  onChanged: (v) => setState(() => _selectedSw = v),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildStorageRow() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          const SizedBox(width: 100, child: Text('저장량', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+          SizedBox(
+            width: 80,
+            height: 36,
+            child: TextField(
+              controller: _tankKg01Controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                isDense: true,
+              ),
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text('kg', style: TextStyle(fontSize: 13)),
+          ),
+          SizedBox(
+            width: 80,
+            height: 36,
+            child: TextField(
+              controller: _tankKg02Controller,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: InputDecoration(
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                isDense: true,
+              ),
+              style: const TextStyle(fontSize: 13),
+            ),
+          ),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 4),
+            child: Text('kg', style: TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCheckTable() {
+    return Column(
+      children: [
+        // Table header
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade200,
+            border: Border(bottom: BorderSide(color: Colors.grey.shade400)),
+          ),
+          child: const Row(
+            children: [
+              Expanded(flex: 5, child: Text('점검내용', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+              SizedBox(width: 4),
+              SizedBox(width: 80, child: Text('결과', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+              SizedBox(width: 4),
+              Expanded(flex: 3, child: Text('비고', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold), textAlign: TextAlign.center)),
+            ],
+          ),
+        ),
+        // Items 1-9 (fixed labels)
+        for (int i = 0; i < 9; i++)
+          _buildCheckTableRow(
+            _tankLabels[i],
+            'ANZ_TANK_${(i + 1).toString().padLeft(2, '0')}',
+            isEditable: false,
+          ),
+        // Items 10-12 (editable labels)
+        _buildCheckTableRow(
+          null,
+          'ANZ_TANK_10',
+          isEditable: true,
+          labelPrefix: '10. ',
+          labelController: _checkItem10Controller,
+        ),
+        _buildCheckTableRow(
+          null,
+          'ANZ_TANK_11',
+          isEditable: true,
+          labelPrefix: '11. ',
+          labelController: _checkItem11Controller,
+        ),
+        _buildCheckTableRow(
+          null,
+          'ANZ_TANK_12',
+          isEditable: true,
+          labelPrefix: '12. ',
+          labelController: _checkItem12Controller,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCheckTableRow(
+    String? label,
+    String key, {
+    bool isEditable = false,
+    String labelPrefix = '',
+    TextEditingController? labelController,
+  }) {
+    final value = _tankItems[key] ?? '';
+    final bigoKey = '${key}_Bigo';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.grey.shade200)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          // Label column
+          Expanded(
+            flex: 5,
+            child: isEditable && labelController != null
+                ? Row(
+                    children: [
+                      Text(labelPrefix, style: const TextStyle(fontSize: 12)),
+                      Expanded(
+                        child: SizedBox(
+                          height: 34,
+                          child: TextField(
+                            controller: labelController,
+                            decoration: InputDecoration(
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 6),
+                              isDense: true,
+                            ),
+                            style: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ),
+                    ],
+                  )
+                : Text(label ?? '', style: const TextStyle(fontSize: 12)),
+          ),
+          const SizedBox(width: 4),
+          // Result dropdown
+          SizedBox(
+            width: 80,
+            height: 34,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              child: DropdownButtonHideUnderline(
+                child: DropdownButton<String>(
+                  value: _resultOptions.any((e) => e.key == value) ? value : '',
+                  isExpanded: true,
+                  isDense: true,
+                  style: const TextStyle(fontSize: 12, color: Colors.black87),
+                  items: _resultOptions.map((e) => DropdownMenuItem<String>(
+                    value: e.key,
+                    child: Text(e.value, style: TextStyle(
+                      fontSize: 12,
+                      color: e.key == '2' ? Colors.red : Colors.black87,
+                    )),
+                  )).toList(),
+                  onChanged: (v) {
+                    if (v != null) setState(() => _tankItems[key] = v);
+                  },
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Bigo text field
+          Expanded(
+            flex: 3,
+            child: SizedBox(
+              height: 34,
+              child: TextField(
+                controller: _bigoControllers[bigoKey],
+                decoration: InputDecoration(
+                  hintText: '비고',
+                  hintStyle: const TextStyle(fontSize: 11, color: Colors.grey),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+                  isDense: true,
+                ),
+                style: const TextStyle(fontSize: 12),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignatureSection() {
+    final hasSignature = _signatureBase64 != null && _signatureBase64!.isNotEmpty;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('서명', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+            const SizedBox(width: 12),
+            ElevatedButton.icon(
+              onPressed: _openSignatureDialog,
+              icon: const Icon(Icons.edit, size: 16),
+              label: Text(hasSignature ? '서명수정' : '서명등록', style: const TextStyle(fontSize: 13)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF555555),
+                foregroundColor: Colors.white,
+                minimumSize: const Size(0, 36),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              ),
+            ),
+            if (hasSignature) ...[
+              const SizedBox(width: 8),
+              TextButton(
+                onPressed: () => setState(() => _signatureBase64 = null),
+                child: const Text('서명삭제', style: TextStyle(fontSize: 13, color: Colors.red)),
+              ),
+            ],
+          ],
+        ),
+        if (hasSignature) ...[
+          const SizedBox(height: 8),
+          Container(
+            height: 100,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(4),
+              color: Colors.white,
+            ),
+            child: _buildSignaturePreview(),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildSignaturePreview() {
+    if (_signatureBase64 == null || _signatureBase64!.isEmpty) {
+      return const Center(child: Text('서명 없음', style: TextStyle(color: Colors.grey)));
+    }
+    try {
+      String base64Str = _signatureBase64!;
+      if (base64Str.contains(',')) {
+        base64Str = base64Str.split(',').last;
+      }
+      final bytes = base64Decode(base64Str);
+      return Image.memory(bytes, fit: BoxFit.contain);
+    } catch (_) {
+      return const Center(child: Text('서명 미리보기 오류', style: TextStyle(color: Colors.grey)));
+    }
+  }
+
   Widget _buildBottomButtons() {
     return Container(
       padding: const EdgeInsets.all(8),
       decoration: BoxDecoration(color: Colors.white, boxShadow: [BoxShadow(color: Colors.grey.shade300, blurRadius: 4, offset: const Offset(0, -2))]),
-      child: Column(
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(child: _actionBtn('점검 저장', const Color(0xFF555555), () async {
-                final ok = await _confirmDialog('정말 저장하시겠습니까?');
-                if (ok) _save();
-              })),
-              const SizedBox(width: 8),
-              Expanded(child: _actionBtn('저장 후 SMS 전송', const Color(0xFF5CB85C), () async {
-                final ok = await _confirmDialog('정말로 SMS를 발송하시겠습니까?');
-                if (ok) _save(sendSMS: true);
-              })),
-            ],
-          ),
-          if (!_isNew) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: _actionBtn('삭제', Colors.red, _delete),
-            ),
-          ],
+          Expanded(child: _actionBtn('점검 저장', const Color(0xFF555555), () async {
+            final ok = await _confirmDialog('정말 저장하시겠습니까?');
+            if (ok) _save();
+          })),
+          const SizedBox(width: 8),
+          Expanded(child: _actionBtn('저장 후 SMS 전송', const Color(0xFF5CB85C), () async {
+            final ok = await _confirmDialog('정말로 SMS를 발송하시겠습니까?');
+            if (ok) _save(sendSMS: true);
+          })),
         ],
       ),
     );
@@ -400,8 +778,11 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
       onTap: onTap,
       child: Container(
         height: 44, alignment: Alignment.center,
-        decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(6)),
-        child: Text(text, style: const TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
+        decoration: BoxDecoration(
+          border: Border.all(color: color, width: 1.5),
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Text(text, style: TextStyle(fontSize: 14, color: color, fontWeight: FontWeight.bold)),
       ),
     );
   }
@@ -418,41 +799,23 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
 
   Widget _textField(String label, TextEditingController ctrl, {bool readOnly = false, VoidCallback? onTap, TextInputType keyboardType = TextInputType.text}) {
     return Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [
-      SizedBox(width: 100, child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w500))),
-      Expanded(child: SizedBox(height: 34, child: TextField(
+      SizedBox(width: 100, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+      Expanded(child: SizedBox(height: 36, child: TextField(
         controller: ctrl, readOnly: readOnly, onTap: onTap, keyboardType: keyboardType,
         decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 8), isDense: true),
-        style: const TextStyle(fontSize: 12),
+        style: const TextStyle(fontSize: 13),
       ))),
     ]));
   }
 
-  Widget _checkRow(String label, String key) {
-    final value = _tankItems[key] ?? '';
-    return Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: Row(children: [
-      Expanded(child: Text(label, style: const TextStyle(fontSize: 12))),
-      _checkBtn('적합', Keys.tankPassed, value, key),
-      _checkBtn('부적합', Keys.tankFailed, value, key),
-      _checkBtn('해당없음', Keys.tankNone, value, key),
-    ]));
-  }
-
-  Widget _checkBtn(String label, String itemValue, String currentValue, String key) {
-    final isSelected = currentValue == itemValue;
-    return GestureDetector(
-      onTap: () => setState(() => _tankItems[key] = itemValue),
-      child: Container(
-        margin: const EdgeInsets.only(left: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(color: isSelected ? const Color(0xFF555555) : Colors.grey.shade200, borderRadius: BorderRadius.circular(4)),
-        child: Text(label, style: TextStyle(fontSize: 10, color: isSelected ? Colors.white : Colors.black54)),
-      ),
-    );
-  }
-
   Future<void> _pickDate(TextEditingController controller) async {
-    final date = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2100));
+    final date = await CommonWidgets.showKoreanDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
     if (date != null) controller.text = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
@@ -464,6 +827,10 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
     _bigo1Controller.dispose();
     _bigo2Controller.dispose();
     _anzCuConfirmTelController.dispose();
+    _anzCustNameController.dispose();
+    _checkItem10Controller.dispose();
+    _checkItem11Controller.dispose();
+    _checkItem12Controller.dispose();
     for (final c in _bigoControllers.values) c.dispose();
     super.dispose();
   }

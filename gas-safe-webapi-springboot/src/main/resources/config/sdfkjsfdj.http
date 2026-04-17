@@ -1,0 +1,24 @@
+### test/test로 로그인 요청 (121.254.173.234 서버)
+
+POST http://121.254.173.234:9999/gas/api/auth/login
+Content-Type: application/json
+
+{
+  "loginId": "test",
+  "loginPwd": "test",
+  "uuid": "dummy-uuid",
+  "mobileNumber": "01011112222",
+  "appVersion": "1.0.0"
+}
+###
+
+POST http://localhost:8000/gas/api/auth/login
+Content-Type: application/json
+
+{
+  "loginId": "test",
+  "loginPwd": "test",
+  "uuid": "dummy-uuid",
+  "mobileNumber": "01011112222",
+  "appVersion": "1.0.0"
+}

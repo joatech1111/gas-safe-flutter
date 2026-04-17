@@ -1,0 +1,11 @@
+java -jar build/libs/joatech-gasmax-webapi-1.1.2.jar --server.port=3339 --gasmax.session.timeout=43200
+
+
+java -jar joatech-gasmax-webapi-2.0.0.jar --server.port=9999 --gasmax.session.timeout=43200
+
+//192.168.100.138
+
+
+## 운영서버에서 실행시에!!!!
+java -jar joatech-gasmax-webapi-2.0.0.jar --server.port=9999 --gasmax.session.timeout=43200 --gasmax.datasource.host=192.168.100.138
+
