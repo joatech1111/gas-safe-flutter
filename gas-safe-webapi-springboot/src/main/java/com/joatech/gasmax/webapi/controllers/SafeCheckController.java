@@ -1916,6 +1916,7 @@ public class SafeCheckController {
 			JsonNode jsonRootNode = mapper.readTree(jsonData);
 			String customerSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign");
 			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
+			logger.info("create-cont sign payload lengths - customer:{}, supplier:{}", safeLength(customerSignRaw), safeLength(supplierSignRaw));
 
 			fileDownloadController.createPDF(randomString.toString(), anCont, customerSignRaw, supplierSignRaw);
 
@@ -2015,6 +2016,7 @@ public class SafeCheckController {
 			JsonNode jsonRootNode = mapper.readTree(jsonData);
 			String customerSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign");
 			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
+			logger.info("update-cont sign payload lengths - customer:{}, supplier:{}, anzSno:{}", safeLength(customerSignRaw), safeLength(supplierSignRaw), anCont.getAnzSno());
 			String contFileUrl = anCont.getContFileUrl() == null ? "" : anCont.getContFileUrl().trim();
 			if (contFileUrl.isEmpty()) {
 				String generatedFileName = generateContractPdfFileName();
@@ -3294,6 +3296,9 @@ public class SafeCheckController {
 		return safeInsertList;
 	}
 
+	private int safeLength(String value) {
+		return value == null ? 0 : value.length();
+	}
 
 
 }

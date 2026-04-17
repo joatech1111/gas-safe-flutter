@@ -14,6 +14,7 @@ import java.beans.Expression;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.Files;
 import java.nio.charset.StandardCharsets;
 
 import java.io.*;
@@ -24,6 +25,8 @@ import java.io.IOException;
 
 import java.io.BufferedWriter;
 import java.io.FileWriter;
+import java.util.Base64;
+import java.util.regex.Matcher;
 
 import org.springframework.stereotype.Component;
 
@@ -272,7 +275,7 @@ public class FileDownloadController {
             2. xml 기준 html 태그 확인( ex : <p> </p> , <img/> , <col/> )
             위 조건을 지키지 않을 경우 DocumentException 발생
             */
-            String htmlStr = toXmlWorkerSafeHtml(buildTwoPageContractHtml(ContData, customerSign, supplierSign));
+            String htmlStr = toXmlWorkerSafeHtml(buildTwoPageContractHtml(filename, ContData, customerSign, supplierSign));
 
             // HTML 내용을 PDF 파일에 삽입
             StringReader stringReader = new StringReader(htmlStr);
@@ -307,36 +310,73 @@ public class FileDownloadController {
 
     }
 
-    private String buildTwoPageContractHtml(AnCont contData, String customerSign, String supplierSign) {
+    private String buildTwoPageContractHtml(String filename, AnCont contData, String customerSign, String supplierSign) {
         // Keep production generation aligned with the long-form template that was
         // previously used for stable two-page output.
         String html = AnContfileTest();
-        return injectSignatureImages(html, customerSign, supplierSign);
+        return injectSignatureImages(filename, html, customerSign, supplierSign);
     }
 
-    private String injectSignatureImages(String html, String customerSign, String supplierSign) {
+    private String injectSignatureImages(String filename, String html, String customerSign, String supplierSign) {
         if (html == null || html.isEmpty()) return html;
         String output = html;
 
-        String supplierImg = toSignatureImgTag(supplierSign);
-        String customerImg = toSignatureImgTag(customerSign);
+        String supplierImg = toSignatureImgTag(filename, "supplier", supplierSign);
+        String customerImg = toSignatureImgTag(filename, "customer", customerSign);
 
         if (!supplierImg.isEmpty()) {
-            output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", supplierImg);
+            output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", Matcher.quoteReplacement(supplierImg));
         }
         if (!customerImg.isEmpty()) {
-            output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", customerImg);
+            output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", Matcher.quoteReplacement(customerImg));
         }
         return output;
     }
 
-    private String toSignatureImgTag(String signRaw) {
+    private String toSignatureImgTag(String filename, String role, String signRaw) {
+        String src = resolveSignatureImageSource(filename, role, signRaw);
+        if (src.isEmpty()) return "";
+        return "<img src='" + src + "' style='width:120px;height:48px;object-fit:contain;vertical-align:middle;' />";
+    }
+
+    private String resolveSignatureImageSource(String filename, String role, String signRaw) {
         if (signRaw == null) return "";
         String sign = signRaw.trim();
         if (sign.isEmpty()) return "";
 
-        String src = sign.startsWith("data:image") ? sign : "data:image/png;base64," + sign;
-        return "<img src='" + src + "' style='width:120px;height:48px;object-fit:contain;vertical-align:middle;' />";
+        if (sign.startsWith("http://") || sign.startsWith("https://") || sign.startsWith("file:")) {
+            return sign;
+        }
+        if (sign.startsWith("/") || sign.startsWith("./")) {
+            return Paths.get(sign).toAbsolutePath().normalize().toUri().toString();
+        }
+
+        String ext = "png";
+        String payload = sign;
+        if (sign.startsWith("data:image")) {
+            int slashIndex = sign.indexOf('/');
+            int semicolonIndex = sign.indexOf(';');
+            int base64MarkerIndex = sign.indexOf("base64,");
+            if (slashIndex > -1 && semicolonIndex > slashIndex) {
+                ext = sign.substring(slashIndex + 1, semicolonIndex).toLowerCase();
+                if ("jpeg".equals(ext)) ext = "jpg";
+            }
+            if (base64MarkerIndex > -1) {
+                payload = sign.substring(base64MarkerIndex + "base64,".length());
+            }
+        }
+
+        payload = payload.replaceAll("\\s+", "");
+        if (payload.isEmpty()) return "";
+
+        try {
+            byte[] imageBytes = Base64.getMimeDecoder().decode(payload);
+            Path signPath = pdfFolder1.resolve(filename + "-" + role + "." + ext).normalize();
+            Files.write(signPath, imageBytes);
+            return signPath.toUri().toString();
+        } catch (IllegalArgumentException | IOException ignored) {
+            return "";
+        }
     }
 
     private String toXmlWorkerSafeHtml(String html) {
