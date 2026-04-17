@@ -2022,13 +2022,11 @@ public class SafeCheckController {
 			String customerSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign");
 			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
 			logger.info("update-cont sign payload lengths - customer:{}, supplier:{}, anzSno:{}", safeLength(customerSignRaw), safeLength(supplierSignRaw), anCont.getAnzSno());
-			String contFileUrl = anCont.getContFileUrl() == null ? "" : anCont.getContFileUrl().trim();
-			if (contFileUrl.isEmpty()) {
-				String generatedFileName = generateContractPdfFileName();
-				fileDownloadController.createPDF(generatedFileName, anCont, customerSignRaw, supplierSignRaw);
-				contFileUrl = "http://gas.joaoffice.com:14013/download/" + generatedFileName + ".pdf";
-				anCont.setContFileUrl(contFileUrl);
-			}
+			// 매번 PDF 재생성 (서명 갱신 반영)
+			String generatedFileName = generateContractPdfFileName();
+			fileDownloadController.createPDF(generatedFileName, anCont, customerSignRaw, supplierSignRaw);
+			String contFileUrl = downloadBaseUrl + "/download/" + generatedFileName + ".pdf";
+			anCont.setContFileUrl(contFileUrl);
 			AnContService anContService = new AnContService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> mapResult = anContService.updateAnCont(anCont);
 			anContService.close();
