@@ -18,7 +18,7 @@ public class ImageController {
     // 이미지가 저장된 경로 (OS별 자동 분기)
     private final Path imageFolder = System.getProperty("os.name").toLowerCase().contains("win")
             ? Paths.get("D:\\0.안전관리\\gasmax\\gasmax\\gasmax-web-api\\static\\img")
-            : Paths.get(System.getProperty("user.home"), "gas-safe-flutter", "gas-safe-webapi-springboot", "static", "img");
+            : Paths.get(System.getProperty("user.dir"), "static", "img");
 
     @GetMapping("/image/{imageName}")
     public ResponseEntity<Resource> getImage(@PathVariable String imageName) throws IOException {

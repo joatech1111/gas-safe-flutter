@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+
+  gas-api:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "14013:8000"
+    depends_on:
+      - redis
+    volumes:
+      - ./cont_doc:/app/cont_doc
+      - ./static/img:/app/static/img
+      - ./AnCont_pdf:/app/AnCont_pdf
+      - ./logs:/app/logs
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_REDIS_HOST=redis
+
+volumes:
+  redis-data:

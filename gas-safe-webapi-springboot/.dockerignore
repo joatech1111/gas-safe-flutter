@@ -1,0 +1,10 @@
+build/
+.gradle/
+.idea/
+*.log
+logs/
+cont_doc/
+static/
+AnCont_pdf/
+work/
+bin/
