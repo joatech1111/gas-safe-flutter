@@ -103,10 +103,6 @@ public class SafeCheckController {
 	/*================================================================
 	 * Public Rest API
 	 ================================================================*/
-
-	private final Path pdfFolder = Paths.get("D:\\0.안전관리\\gasmax\\gasmax\\gasmax-web-api\\cont_doc");
-
-
 	/*
 	 * 안전점검 거래처 검색 조건 API
 	 */
