@@ -100,7 +100,9 @@ public class SafeCheckController {
 	 * Public Rest API
 	 ================================================================*/
 
-	private final Path pdfFolder = Paths.get("D:\\0.안전관리\\gasmax\\gasmax\\gasmax-web-api\\cont_doc");
+	private final Path pdfFolder = System.getProperty("os.name").toLowerCase().contains("win")
+			? Paths.get("D:\\0.안전관리\\gasmax\\gasmax\\gasmax-web-api\\cont_doc")
+			: Paths.get(System.getProperty("user.dir"), "cont_doc");
 
 
 	/*
