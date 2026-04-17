@@ -1912,8 +1912,12 @@ public class SafeCheckController {
 
 			// Read json data
 			AnCont anCont = parseJsonAnCont(false, jsonData);
+			ObjectMapper mapper = new ObjectMapper();
+			JsonNode jsonRootNode = mapper.readTree(jsonData);
+			String customerSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign");
+			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
 
-			fileDownloadController.createPDF(randomString.toString(), anCont);
+			fileDownloadController.createPDF(randomString.toString(), anCont, customerSignRaw, supplierSignRaw);
 
 			String CONT_FILE_URL = "http://gas.joaoffice.com:14013/download/" + randomString.toString() + ".pdf";
 
@@ -1937,9 +1941,6 @@ public class SafeCheckController {
 			anSobiSign.setAnzDate(anCont.getAnzDate());
 			anSobiSign.setAnzId(anCont.getUserno());
 
-			ObjectMapper mapper = new ObjectMapper();
-			JsonNode jsonRootNode = mapper.readTree(jsonData);
-
 			String nodeName = "ANZ_Sign";
 			anSobiSign.setAnzSign(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
 
@@ -1958,8 +1959,6 @@ public class SafeCheckController {
 			anSobiSignC.setAnzSno("P" + AnzSNo);
 			anSobiSignC.setAnzDate(anCont.getAnzDate());
 			anSobiSignC.setAnzId(anCont.getUserno());
-
-			jsonRootNode = mapper.readTree(jsonData);
 
 			nodeName = "ANZ_Sign_C";
 			anSobiSignC.setAnzSign(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
@@ -2012,10 +2011,14 @@ public class SafeCheckController {
 
 			// Read json data
 			AnCont anCont = parseJsonAnCont(false, jsonData);
+			ObjectMapper mapper = new ObjectMapper();
+			JsonNode jsonRootNode = mapper.readTree(jsonData);
+			String customerSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign");
+			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
 			String contFileUrl = anCont.getContFileUrl() == null ? "" : anCont.getContFileUrl().trim();
 			if (contFileUrl.isEmpty()) {
 				String generatedFileName = generateContractPdfFileName();
-				fileDownloadController.createPDF(generatedFileName, anCont);
+				fileDownloadController.createPDF(generatedFileName, anCont, customerSignRaw, supplierSignRaw);
 				contFileUrl = "http://gas.joaoffice.com:14013/download/" + generatedFileName + ".pdf";
 				anCont.setContFileUrl(contFileUrl);
 			}
@@ -2031,8 +2034,6 @@ public class SafeCheckController {
 			anSobiSign.setAnzSno("C"+ anCont.getAnzSno());
 			anSobiSign.setAnzDate(anCont.getAnzDate());
 			anSobiSign.setAnzId(anCont.getUserno());
-			ObjectMapper mapper = new ObjectMapper();
-			JsonNode jsonRootNode = mapper.readTree(jsonData);
 			String nodeName = "ANZ_Sign";
 			anSobiSign.setAnzSign(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
 			AnSobiSignService anSobiSignService = new AnSobiSignService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
@@ -2045,8 +2046,6 @@ public class SafeCheckController {
 			anSobiSign.setAnzSno("P"+ anCont.getAnzSno());
 			anSobiSign.setAnzDate(anCont.getAnzDate());
 			anSobiSign.setAnzId(anCont.getUserno());
-			mapper = new ObjectMapper();
-			jsonRootNode = mapper.readTree(jsonData);
 			nodeName = "ANZ_Sign_C";
 			anSobiSign.setAnzSign(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
 			anSobiSignService = new AnSobiSignService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());

@@ -177,6 +177,10 @@ public class FileDownloadController {
     }
 
     public void createPDF(String filename, AnCont ContData) {
+        createPDF(filename, ContData, "", "");
+    }
+
+    public void createPDF(String filename, AnCont ContData, String customerSign, String supplierSign) {
 
         // 최초 문서 사이즈 설정
         Document document = new Document(PageSize.B4, 20, 20, 0, 0);
@@ -268,7 +272,7 @@ public class FileDownloadController {
             2. xml 기준 html 태그 확인( ex : <p> </p> , <img/> , <col/> )
             위 조건을 지키지 않을 경우 DocumentException 발생
             */
-            String htmlStr = toXmlWorkerSafeHtml(buildTwoPageContractHtml(ContData));
+            String htmlStr = toXmlWorkerSafeHtml(buildTwoPageContractHtml(ContData, customerSign, supplierSign));
 
             // HTML 내용을 PDF 파일에 삽입
             StringReader stringReader = new StringReader(htmlStr);
@@ -303,10 +307,36 @@ public class FileDownloadController {
 
     }
 
-    private String buildTwoPageContractHtml(AnCont contData) {
+    private String buildTwoPageContractHtml(AnCont contData, String customerSign, String supplierSign) {
         // Keep production generation aligned with the long-form template that was
         // previously used for stable two-page output.
-        return AnContfileTest();
+        String html = AnContfileTest();
+        return injectSignatureImages(html, customerSign, supplierSign);
+    }
+
+    private String injectSignatureImages(String html, String customerSign, String supplierSign) {
+        if (html == null || html.isEmpty()) return html;
+        String output = html;
+
+        String supplierImg = toSignatureImgTag(supplierSign);
+        String customerImg = toSignatureImgTag(customerSign);
+
+        if (!supplierImg.isEmpty()) {
+            output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", supplierImg);
+        }
+        if (!customerImg.isEmpty()) {
+            output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", customerImg);
+        }
+        return output;
+    }
+
+    private String toSignatureImgTag(String signRaw) {
+        if (signRaw == null) return "";
+        String sign = signRaw.trim();
+        if (sign.isEmpty()) return "";
+
+        String src = sign.startsWith("data:image") ? sign : "data:image/png;base64," + sign;
+        return "<img src='" + src + "' style='width:120px;height:48px;object-fit:contain;vertical-align:middle;' />";
     }
 
     private String toXmlWorkerSafeHtml(String html) {
