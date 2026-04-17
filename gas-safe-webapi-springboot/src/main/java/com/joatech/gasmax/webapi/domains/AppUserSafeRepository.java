@@ -233,51 +233,6 @@ public class AppUserSafeRepository extends GasMaxRepository {
         return jdbcTemplate.update(queryString, appUserSafe.getHpImei(), appUserSafe.getHpSNo(), appUserSafe.getLoginCo(), appUserSafe.getLoginName(), appUserSafe.getLoginName(), appUserSafe.getLoginPassword());
 	}
 
-	public List<AppUserSafe> findAllByHpSNo(String hpSNo) {
-		String queryString   =  " SELECT HP_IMEI, HP_State, HP_Model, HP_SNO, APP_VER, SVR_IP_NO AS SVR_IP, SVR_DBName, SVR_User, SVR_Pass, SVR_Port, "
-							 +  " Login_Co, Login_Name, Login_User, Login_Pass, BA_Area_CODE, BA_SW_CODE, BA_Gubun_CODE,"
-							 +  " BA_JY_Code, BA_OrderBy,Safe_SW_CODE , License_Date, Login_StartDate, Login_LastDate, Login_EndDate,"
-							 +  " Login_info, Login_Memo, APP_Cert, GPS_SEARCH_YN from APPUser_Safe "
-							 +  " WHERE HP_State = 'Y' AND HP_SNO = ?";
-
-		return jdbcTemplate.query(
-				queryString,
-				(rs, rowNum) -> {
-					AppUserSafe appUserSafe = new AppUserSafe();
-					appUserSafe.setHpImei(rs.getString("HP_IMEI"));
-					appUserSafe.setHpState(rs.getString("HP_State"));
-					appUserSafe.setHpModel(rs.getString("HP_Model"));
-					appUserSafe.setHpSNo(rs.getString("HP_SNO"));
-					appUserSafe.setAppVersion(rs.getString("APP_VER"));
-					appUserSafe.setServerIp(rs.getString("SVR_IP"));
-					appUserSafe.setServerDBName(rs.getString("SVR_DBName"));
-					appUserSafe.setServerUser(rs.getString("SVR_User"));
-					appUserSafe.setServerPassword(rs.getString("SVR_Pass"));
-					appUserSafe.setServerPort(rs.getString("SVR_Port"));
-					appUserSafe.setLoginCo(rs.getString("Login_Co"));
-					appUserSafe.setLoginName(rs.getString("Login_Name"));
-					appUserSafe.setLoginUser(rs.getString("Login_User"));
-					appUserSafe.setLoginPassword(rs.getString("Login_Pass"));
-					appUserSafe.setBaAreaCode(rs.getString("BA_Area_CODE"));
-					appUserSafe.setBaSWCode(rs.getString("BA_SW_CODE"));
-					appUserSafe.setBaGubunCode(rs.getString("BA_Gubun_CODE"));
-					appUserSafe.setBaJYCode(rs.getString("BA_JY_Code"));
-					appUserSafe.setBaOrderBy(rs.getString("BA_OrderBy"));
-					appUserSafe.setSafeSWCode(rs.getString("Safe_SW_CODE"));
-					appUserSafe.setLicenseDate(rs.getString("License_Date"));
-					appUserSafe.setLoginStartDate(rs.getString("Login_StartDate"));
-					appUserSafe.setLoginLastDate(rs.getString("Login_LastDate"));
-					appUserSafe.setLoginEndDate(rs.getString("Login_EndDate"));
-					appUserSafe.setLoginInfo(rs.getString("Login_info"));
-					appUserSafe.setLoginMemo(rs.getString("Login_Memo"));
-					appUserSafe.setAppCert(rs.getString("APP_Cert"));
-					appUserSafe.setGpsSearchYN(rs.getString("GPS_SEARCH_YN"));
-					return appUserSafe;
-				},
-				hpSNo
-		);
-	}
-
 	public int updateAppUserSafeForAppVersionAndLoginLastDateByHpImei(String appVersion, String loginLastDate, String hpImei) {
 		
 		String queryString = "UPDATE APPUser_Safe SET APP_VER = ?, Login_LastDate = ? WHERE HP_State = 'Y' AND HP_IMEI = ?";

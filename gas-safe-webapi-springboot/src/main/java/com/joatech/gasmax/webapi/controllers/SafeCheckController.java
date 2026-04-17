@@ -23,11 +23,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Random;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.regex.Pattern;
-import java.util.concurrent.ConcurrentHashMap;
 
 import java.util.HashMap;
 
@@ -92,7 +87,6 @@ public class SafeCheckController {
 	 * Private Members
 	 ================================================================*/
 	private final Logger logger = LoggerFactory.getLogger(getClass());
-	private final Map<String, ContractContext> lastContractContextBySession = new ConcurrentHashMap<>();
 
 	/*================================================================
 	 * Private Autowired Members
@@ -105,6 +99,10 @@ public class SafeCheckController {
 	/*================================================================
 	 * Public Rest API
 	 ================================================================*/
+
+	private final Path pdfFolder = Paths.get("D:\\0.안전관리\\gasmax\\gasmax\\gasmax-web-api\\cont_doc");
+
+
 	/*
 	 * 안전점검 거래처 검색 조건 API
 	 */
@@ -991,16 +989,6 @@ public class SafeCheckController {
 	public RestAPIResult smsNoticeSmsDiv(
 			@PathVariable("area_code") String areaCode,
 			@PathVariable("sms_div") String smsDiv,
-			@RequestParam(value = "cont_file_url", required = false) Optional<String> optContFileUrl,
-			@RequestParam(value = "preview_url", required = false) Optional<String> optPreviewUrl,
-			@RequestParam(value = "anz_cu_code", required = false) Optional<String> optAnzCuCode,
-			@RequestParam(value = "anz_sno", required = false) Optional<String> optAnzSno,
-			@RequestParam(value = "supplier_name", required = false) Optional<String> optSupplierName,
-			@RequestParam(value = "customer_name", required = false) Optional<String> optCustomerName,
-			@RequestParam(value = "contract_name", required = false) Optional<String> optContractName,
-			@RequestParam(value = "address", required = false) Optional<String> optAddress,
-			@RequestParam(value = "inspector_name", required = false) Optional<String> optInspectorName,
-			@RequestParam(value = "contract_date", required = false) Optional<String> optContractDate,
 			@RequestParam("sessionid") Optional<String> optSessionId)
 					throws SessionIdNotReceivedException, InvalidSessionIdException {
 		String result = GasMaxErrors.ERROR_OK;
@@ -1022,217 +1010,11 @@ public class SafeCheckController {
 			SMSNoticesService smsNoticesService = new SMSNoticesService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> smsNoticesList = smsNoticesService.getSMSNoticesByAreaCodeAndSmsDiv(areaCode, smsDiv);
 			smsNoticesService.close();
-
-			String resolvedContFileUrl = resolveContractFileUrl(
-					appUserSafe,
-					sessionId,
-					areaCode,
-					optContFileUrl.orElse(""),
-					optAnzCuCode.orElse(""),
-					optAnzSno.orElse(""));
-
-			applySmsPlaceholders(
-					smsNoticesList,
-					Optional.ofNullable(resolvedContFileUrl),
-					optPreviewUrl,
-					optSupplierName,
-					optCustomerName,
-					optContractName,
-					optAddress,
-					optInspectorName,
-					optContractDate);
 			resultData = smsNoticesList; //.get(0).get("SMS_Msg");
 		}
 
 		RestAPIResult apiResult = new RestAPIResult(result, resultCode, resultData);
 		return apiResult;
-	}
-
-	private String resolveContractFileUrl(
-			AppUserSafe appUserSafe,
-			String sessionId,
-			String areaCode,
-			String contFileUrl,
-			String anzCuCode,
-			String anzSno) {
-		String resolved = contFileUrl == null ? "" : contFileUrl.trim();
-		if (!resolved.isEmpty()) return resolved;
-		if (anzCuCode == null || anzCuCode.trim().isEmpty()) {
-			ContractContext context = lastContractContextBySession.get(sessionId);
-			if (context != null) {
-				if (areaCode == null || areaCode.trim().isEmpty()) {
-					areaCode = context.areaCode;
-				}
-				anzCuCode = context.anzCuCode;
-				if (anzSno == null || anzSno.trim().isEmpty()) {
-					anzSno = context.anzSno;
-				}
-			}
-		}
-		if (anzCuCode == null || anzCuCode.trim().isEmpty()) return "";
-
-		AnContService anContService = null;
-		try {
-			anContService = new AnContService(
-					appUserSafe.getServerIp(),
-					Integer.parseInt(appUserSafe.getServerPort()),
-					appUserSafe.getServerDBName(),
-					appUserSafe.getServerUser(),
-					appUserSafe.getServerPassword());
-
-			List<Map<String, Object>> listResult;
-			if (anzSno != null && !anzSno.trim().isEmpty()) {
-				listResult = anContService.getAnContServiceBy(areaCode, anzCuCode.trim(), anzSno.trim());
-			} else {
-				listResult = anContService.getLastAnContServiceBy(areaCode, anzCuCode.trim());
-			}
-
-			if (listResult != null && !listResult.isEmpty()) {
-				Object urlObj = listResult.get(0).get("CONT_FILE_URL");
-				if (urlObj != null) {
-					resolved = urlObj.toString().trim();
-				}
-			}
-		} catch (Exception e) {
-			logger.warn("Failed to resolve contract file url for sms. areaCode={}, anzCuCode={}, anzSno={}",
-					areaCode, anzCuCode, anzSno, e);
-		} finally {
-			if (anContService != null) anContService.close();
-		}
-		return resolved;
-	}
-
-	private void applySmsPlaceholders(
-			Map<String, Object> smsNoticesList,
-			Optional<String> optContFileUrl,
-			Optional<String> optPreviewUrl,
-			Optional<String> optSupplierName,
-			Optional<String> optCustomerName,
-			Optional<String> optContractName,
-			Optional<String> optAddress,
-			Optional<String> optInspectorName,
-			Optional<String> optContractDate) {
-		if (smsNoticesList == null) return;
-		String smsMsgKey = findSmsMsgKey(smsNoticesList);
-		if (smsMsgKey == null) return;
-		Object smsObj = smsNoticesList.get(smsMsgKey);
-		if (!(smsObj instanceof String)) return;
-
-		String smsMsg = (String) smsObj;
-		String contFileUrl = optContFileUrl.orElse("").trim();
-		String previewUrl = optPreviewUrl.orElse("").trim();
-		String supplierName = optSupplierName.orElse("").trim();
-		String customerName = optCustomerName.orElse("").trim();
-		String contractName = optContractName.orElse("").trim();
-		String address = optAddress.orElse("").trim();
-		String inspectorName = optInspectorName.orElse("").trim();
-		String contractDate = optContractDate.orElse("").trim();
-
-		if (previewUrl.isEmpty() && !contFileUrl.isEmpty()) {
-			previewUrl = "https://docs.google.com/gview?embedded=true&url="
-					+ URLEncoder.encode(contFileUrl, StandardCharsets.UTF_8);
-		}
-
-		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("공급자상호"), supplierName);
-		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("거래처명", "고객명"), customerName);
-		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("계약자명", "계약자"), contractName);
-		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("주소", "거래처주소"), address);
-		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("계약일"), contractDate);
-		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("점검자", "점검원"), inspectorName);
-		smsMsg = replaceTemplateTokens(
-				smsMsg,
-				Arrays.asList(
-						"CONT_FILE_URL",
-						"PDF_URL",
-						"DOWNLOAD_URL",
-						"download_url",
-						"cont_file_url",
-						"계약서URL",
-						"계약서링크",
-						"계약서다운로드링크",
-						"다운로드링크",
-						"다운로드 링크",
-						"다운링크"),
-				contFileUrl);
-		smsMsg = replaceTemplateTokens(
-				smsMsg,
-				Arrays.asList("앱없이보기", "앱없이 보기", "미리보기링크", "미리보기 링크", "preview_url"),
-				previewUrl);
-
-		if (!contFileUrl.isEmpty()) {
-			boolean hasDownloadUrl = smsMsg.contains(contFileUrl);
-			boolean hasPreviewUrl = !previewUrl.isEmpty() && smsMsg.contains(previewUrl);
-			if (!hasDownloadUrl && !hasPreviewUrl) {
-				StringBuilder sb = new StringBuilder(smsMsg);
-				sb.append("\n\n[가스안전점검표]\n다운로드: ").append(contFileUrl);
-				if (!previewUrl.isEmpty()) {
-					sb.append("\n앱 없이 보기: ").append(previewUrl);
-				}
-				smsMsg = sb.toString();
-			}
-		}
-
-		smsNoticesList.put(smsMsgKey, smsMsg);
-	}
-
-	private String findSmsMsgKey(Map<String, Object> smsNoticesList) {
-		if (smsNoticesList.containsKey("SMS_Msg")) return "SMS_Msg";
-		if (smsNoticesList.containsKey("SMS_MSG")) return "SMS_MSG";
-		for (String key : smsNoticesList.keySet()) {
-			if (key == null) continue;
-			String normalized = key.replace("_", "").toLowerCase();
-			if ("smsmsg".equals(normalized)) return key;
-		}
-		return null;
-	}
-
-	private String replaceTemplateTokens(String text, List<String> keys, String value) {
-		if (text == null || text.isEmpty()) return text;
-		String output = text;
-		for (String key : keys) {
-			if (key == null || key.isEmpty()) continue;
-			String escapedKey = Pattern.quote(key);
-			output = output.replaceAll("(?i)\\{\\s*" + escapedKey + "\\s*\\}", value);
-			output = output.replaceAll("(?i)\\[\\s*" + escapedKey + "\\s*\\]", value);
-			output = output.replaceAll("(?i)\\<\\s*" + escapedKey + "\\s*\\>", value);
-			output = output.replaceAll("(?i)\\#\\s*" + escapedKey + "\\s*\\#", value);
-			output = output.replaceAll("(?i)\\$\\s*" + escapedKey + "\\s*\\$", value);
-		}
-		return output;
-	}
-
-	private String generateContractPdfFileName() {
-		Random random = new Random();
-		int length = 15;
-		StringBuilder randomString = new StringBuilder();
-		for (int i = 0; i < length; i++) {
-			char randomChar = (char) (random.nextInt(26) + 'a' + (random.nextBoolean() ? 0 : 'A' - 'a'));
-			randomString.append(randomChar);
-		}
-		return randomString.toString();
-	}
-
-	private void rememberContractContext(String sessionId, String areaCode, String anzCuCode, String anzSno) {
-		if (sessionId == null || sessionId.trim().isEmpty()) return;
-		if (anzCuCode == null || anzCuCode.trim().isEmpty()) return;
-		lastContractContextBySession.put(
-				sessionId,
-				new ContractContext(
-						areaCode == null ? "" : areaCode.trim(),
-						anzCuCode.trim(),
-						anzSno == null ? "" : anzSno.trim()));
-	}
-
-	private static final class ContractContext {
-		private final String areaCode;
-		private final String anzCuCode;
-		private final String anzSno;
-
-		private ContractContext(String areaCode, String anzCuCode, String anzSno) {
-			this.areaCode = areaCode;
-			this.anzCuCode = anzCuCode;
-			this.anzSno = anzSno;
-		}
 	}
 
 	/*
@@ -1808,7 +1590,6 @@ public class SafeCheckController {
 			mapResult.put("data", listResult);
 			mapResult.put("sign", sign);
 			mapResult.put("sign1", sign1);
-			rememberContractContext(sessionId, areaCode, anzCuCode, anzSno);
 
 			resultData = mapResult;
 		}
@@ -1855,7 +1636,6 @@ public class SafeCheckController {
 				sign = anSobiSignService.getSignByAreaCodeAndAnzCuCodeAndAnzSno(areaCode, anzCuCode, "C"+anzSno);
 				sign1 = anSobiSignService.getSignByAreaCodeAndAnzCuCodeAndAnzSno(areaCode, anzCuCode, "P"+anzSno);
 				anSobiSignService.close();
-				rememberContractContext(sessionId, areaCode, anzCuCode, anzSno);
 			}
 
 			Map<String, Object> mapResult = new HashMap<String, Object>();
@@ -1912,15 +1692,11 @@ public class SafeCheckController {
 
 			// Read json data
 			AnCont anCont = parseJsonAnCont(false, jsonData);
-			ObjectMapper mapper = new ObjectMapper();
-			JsonNode jsonRootNode = mapper.readTree(jsonData);
-			String customerSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign");
-			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
-			logger.info("create-cont sign payload lengths - customer:{}, supplier:{}", safeLength(customerSignRaw), safeLength(supplierSignRaw));
 
-			fileDownloadController.createPDF(randomString.toString(), anCont, customerSignRaw, supplierSignRaw);
+			fileDownloadController.createPDF(randomString.toString(), anCont);
 
-			String CONT_FILE_URL = "http://gas.joaoffice.com:14013/download/" + randomString.toString() + ".pdf";
+			//String CONT_FILE_URL = "http://118.222.92.10:9494/download/" + randomString.toString() + ".pdf";
+			String CONT_FILE_URL = "http://121.254.173.234:9999/download/" + randomString.toString() + ".pdf";
 
 
 
@@ -1942,6 +1718,9 @@ public class SafeCheckController {
 			anSobiSign.setAnzDate(anCont.getAnzDate());
 			anSobiSign.setAnzId(anCont.getUserno());
 
+			ObjectMapper mapper = new ObjectMapper();
+			JsonNode jsonRootNode = mapper.readTree(jsonData);
+
 			String nodeName = "ANZ_Sign";
 			anSobiSign.setAnzSign(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
 
@@ -1960,6 +1739,8 @@ public class SafeCheckController {
 			anSobiSignC.setAnzSno("P" + AnzSNo);
 			anSobiSignC.setAnzDate(anCont.getAnzDate());
 			anSobiSignC.setAnzId(anCont.getUserno());
+
+			jsonRootNode = mapper.readTree(jsonData);
 
 			nodeName = "ANZ_Sign_C";
 			anSobiSignC.setAnzSign(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
@@ -2012,18 +1793,6 @@ public class SafeCheckController {
 
 			// Read json data
 			AnCont anCont = parseJsonAnCont(false, jsonData);
-			ObjectMapper mapper = new ObjectMapper();
-			JsonNode jsonRootNode = mapper.readTree(jsonData);
-			String customerSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign");
-			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
-			logger.info("update-cont sign payload lengths - customer:{}, supplier:{}, anzSno:{}", safeLength(customerSignRaw), safeLength(supplierSignRaw), anCont.getAnzSno());
-			String contFileUrl = anCont.getContFileUrl() == null ? "" : anCont.getContFileUrl().trim();
-			if (contFileUrl.isEmpty()) {
-				String generatedFileName = generateContractPdfFileName();
-				fileDownloadController.createPDF(generatedFileName, anCont, customerSignRaw, supplierSignRaw);
-				contFileUrl = "http://gas.joaoffice.com:14013/download/" + generatedFileName + ".pdf";
-				anCont.setContFileUrl(contFileUrl);
-			}
 			AnContService anContService = new AnContService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> mapResult = anContService.updateAnCont(anCont);
 			anContService.close();
@@ -2036,6 +1805,8 @@ public class SafeCheckController {
 			anSobiSign.setAnzSno("C"+ anCont.getAnzSno());
 			anSobiSign.setAnzDate(anCont.getAnzDate());
 			anSobiSign.setAnzId(anCont.getUserno());
+			ObjectMapper mapper = new ObjectMapper();
+			JsonNode jsonRootNode = mapper.readTree(jsonData);
 			String nodeName = "ANZ_Sign";
 			anSobiSign.setAnzSign(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
 			AnSobiSignService anSobiSignService = new AnSobiSignService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
@@ -2048,6 +1819,8 @@ public class SafeCheckController {
 			anSobiSign.setAnzSno("P"+ anCont.getAnzSno());
 			anSobiSign.setAnzDate(anCont.getAnzDate());
 			anSobiSign.setAnzId(anCont.getUserno());
+			mapper = new ObjectMapper();
+			jsonRootNode = mapper.readTree(jsonData);
 			nodeName = "ANZ_Sign_C";
 			anSobiSign.setAnzSign(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
 			anSobiSignService = new AnSobiSignService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
@@ -2059,9 +1832,6 @@ public class SafeCheckController {
 			if (intResult == 0) {
 				mapResult.clear();
 				mapResult.put("po_CONTRACT_INFO", "E01 공급계약 수정오류.");
-			}
-			if (contFileUrl != null && !contFileUrl.isEmpty()) {
-				mapResult.put("po_CONT_FILE_URL", contFileUrl);
 			}
 			resultData = mapResult;
 		}
@@ -3296,9 +3066,6 @@ public class SafeCheckController {
 		return safeInsertList;
 	}
 
-	private int safeLength(String value) {
-		return value == null ? 0 : value.length();
-	}
 
 
 }

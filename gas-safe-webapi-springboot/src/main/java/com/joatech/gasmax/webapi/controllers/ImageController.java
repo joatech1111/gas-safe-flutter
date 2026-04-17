@@ -16,7 +16,7 @@ import java.nio.file.Paths;
 public class ImageController {
 
     // 이미지가 저장된 경로
-    private final Path imageFolder = Paths.get(System.getProperty("user.dir"), "static", "img");
+    private final Path imageFolder = Paths.get("D:\\0.안전관리\\gasmax\\gasmax\\gasmax-web-api\\static\\img");
 
     @GetMapping("/image/{imageName}")
     public ResponseEntity<Resource> getImage(@PathVariable String imageName) throws IOException {

@@ -9,7 +9,6 @@ import com.joatech.gasmax.webapi.domains.AppUserSafe;
 public interface IAppUserSafeService {
 	
 	Optional<AppUserSafe> getAppUserSafeByHpImei(String hpImei);
-	List<AppUserSafe> getAppUserSafeListByHpSNo(String hpSNo);
 	List<AppUserSafe> getAllAppUserSafe();
 	String getAppUserSafeAuthenticateInfo(String hpImei, String hpModel, String hpSNo, String appVer, String loginCo, String loginName, String loginUser, String loginPassword);
 	
