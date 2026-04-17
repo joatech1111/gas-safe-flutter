@@ -23,7 +23,6 @@ class SafetyContractTab extends StatefulWidget {
 }
 
 class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKeepAliveClientMixin {
-  SafetyCheckContractResultData? _data;
   bool _isLoading = true;
   bool _isNew = false;
   String? _anzSno;
@@ -126,7 +125,6 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       final sign1 = resultData['sign1']?.toString();
       if (dataList is List && dataList.isNotEmpty) {
         final d = SafetyCheckContractResultData.fromJson(dataList.first);
-        _data = d;
         _anzSno = d.anzSno;
         _pdfFileUrl = d.contFileUrl;
         _signatureCustomer = sign;
@@ -277,21 +275,67 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       if (rd != null) {
         if (rd['po_ANZ_Sno'] != null) { _anzSno = rd['po_ANZ_Sno'].toString(); _isNew = false; }
         if (rd['po_CONT_FILE_URL'] != null) { _pdfFileUrl = rd['po_CONT_FILE_URL'].toString(); }
+        if (rd['CONT_FILE_URL'] != null && (rd['CONT_FILE_URL'].toString().trim().isNotEmpty)) {
+          _pdfFileUrl = rd['CONT_FILE_URL'].toString();
+        }
       }
-      if (sendSMS) _sendSMS(req);
+      if (sendSMS) {
+        final contractUrl = await _resolveContractFileUrl(req);
+        await _sendSMS(contractUrl: contractUrl);
+      }
       setState(() {});
     } else {
       NetHelper.handleError(context, resp);
     }
   }
 
-  Future<void> _sendSMS(Map<String, dynamic> req) async {
+  Future<String?> _resolveContractFileUrl(Map<String, dynamic> req) async {
+    String? contractUrl = _pdfFileUrl?.trim();
+    if (contractUrl != null && contractUrl.isNotEmpty) return contractUrl;
+
+    final reqUrl = req['CONT_FILE_URL']?.toString().trim();
+    if (reqUrl != null && reqUrl.isNotEmpty) {
+      _pdfFileUrl = reqUrl;
+      return reqUrl;
+    }
+
+    final areaCode = widget.customer.areaCode ?? AppState.areaCode;
+    final cuCode = widget.customer.cuCode ?? '';
+    final sno = (_anzSno ?? '').trim();
+    if (sno.isEmpty) return null;
+
+    try {
+      final contractResp = await NetHelper.api.safetyCheckContract(areaCode, cuCode, sno);
+      if (NetHelper.isSuccess(contractResp) && contractResp['resultData'] != null) {
+        final resultData = contractResp['resultData'];
+        final dataList = resultData['data'];
+        if (dataList is List && dataList.isNotEmpty) {
+          final first = dataList.first;
+          if (first is Map) {
+            final url = (first['CONT_FILE_URL'] ?? '').toString().trim();
+            if (url.isNotEmpty) {
+              _pdfFileUrl = url;
+              return url;
+            }
+          }
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  Future<void> _sendSMS({String? contractUrl}) async {
     final areaCode = widget.customer.areaCode ?? AppState.areaCode;
     final smsResp = await NetHelper.api.safetySms(areaCode, Keys.smsDivContract);
     String smsMsg = '';
     if (NetHelper.isSuccess(smsResp) && smsResp['resultData'] != null) {
       smsMsg = smsResp['resultData']['SMS_Msg']?.toString() ?? '';
     }
+    final normalizedContractUrl = (contractUrl ?? _pdfFileUrl ?? '').trim();
+    final gUrl = normalizedContractUrl.isEmpty
+        ? ''
+        : 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(normalizedContractUrl)}';
     smsMsg = smsMsg
         .replaceAll('{공급자상호}', _comNameController.text)
         .replaceAll('{거래처명}', widget.customer.cuNameView ?? widget.customer.cuName ?? '')
@@ -299,10 +343,21 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
         .replaceAll('{거래처코드}', widget.customer.cuCode ?? '')
         .replaceAll('{주소}', '$_cuAddr1 $_cuAddr2')
         .replaceAll('{계약일}', _anzDateController.text)
-        .replaceAll('{점검자}', AppState.safeSwName);
-    if (_pdfFileUrl != null && _pdfFileUrl!.isNotEmpty) {
-      final gUrl = 'https://docs.google.com/gview?embedded=true&url=$_pdfFileUrl';
-      smsMsg += '\n\n[가스안전점검표]\n다운로드: $_pdfFileUrl\n앱 없이 보기: $gUrl';
+        .replaceAll('{점검자}', AppState.safeSwName)
+        .replaceAll('{점검원}', AppState.safeSwName)
+        .replaceAll('{CONT_FILE_URL}', normalizedContractUrl)
+        .replaceAll('{PDF_URL}', normalizedContractUrl)
+        .replaceAll('{DOWNLOAD_URL}', normalizedContractUrl)
+        .replaceAll('{계약서URL}', normalizedContractUrl)
+        .replaceAll('{계약서링크}', normalizedContractUrl)
+        .replaceAll('{계약서다운로드링크}', normalizedContractUrl)
+        .replaceAll('{다운로드링크}', normalizedContractUrl)
+        .replaceAll('{앱없이보기}', gUrl)
+        .replaceAll('{미리보기링크}', gUrl);
+    if (normalizedContractUrl.isNotEmpty &&
+        !smsMsg.contains(normalizedContractUrl) &&
+        !smsMsg.contains(gUrl)) {
+      smsMsg += '\n\n[가스안전점검표]\n다운로드: $normalizedContractUrl\n앱 없이 보기: $gUrl';
     }
     final tel = _anzCuConfirmTelController.text.trim();
     if (tel.isEmpty) { Fluttertoast.showToast(msg: '확인 연락처를 입력해주세요.'); return; }
