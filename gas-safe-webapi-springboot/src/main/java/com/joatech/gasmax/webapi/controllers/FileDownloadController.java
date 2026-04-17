@@ -46,6 +46,7 @@ import com.itextpdf.tool.xml.parser.XMLParser;
 import com.itextpdf.tool.xml.pipeline.css.CSSResolver;
 import com.itextpdf.tool.xml.pipeline.css.CssResolverPipeline;
 import com.itextpdf.tool.xml.pipeline.end.PdfWriterPipeline;
+import com.itextpdf.tool.xml.pipeline.html.AbstractImageProvider;
 import com.itextpdf.tool.xml.pipeline.html.HtmlPipeline;
 import com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext;
 import org.springframework.stereotype.Component;
@@ -253,6 +254,13 @@ public class FileDownloadController {
             // HTML Pipeline 생성
             HtmlPipelineContext htmlPipelineContext = new HtmlPipelineContext(cssAppliers);
             htmlPipelineContext.setTagFactory(Tags.getHtmlTagProcessorFactory());
+            // file:// URI 이미지 로드를 위한 ImageProvider 설정
+            htmlPipelineContext.setImageProvider(new AbstractImageProvider() {
+                @Override
+                public String getImageRootPath() {
+                    return pdfFolder1.toAbsolutePath().toString() + File.separator;
+                }
+            });
 
             // ========================================================================================
             // Pipelines
@@ -321,8 +329,16 @@ public class FileDownloadController {
         if (html == null || html.isEmpty()) return html;
         String output = html;
 
+        System.out.println("[SIGN] injectSignatureImages called - supplier:" + (supplierSign != null ? supplierSign.length() : 0) + " customer:" + (customerSign != null ? customerSign.length() : 0));
+
         String supplierImg = toSignatureImgTag(filename, "supplier", supplierSign);
         String customerImg = toSignatureImgTag(filename, "customer", customerSign);
+
+        System.out.println("[SIGN] supplierImg tag: " + (supplierImg.isEmpty() ? "(empty)" : supplierImg.substring(0, Math.min(80, supplierImg.length()))));
+        System.out.println("[SIGN] customerImg tag: " + (customerImg.isEmpty() ? "(empty)" : customerImg.substring(0, Math.min(80, customerImg.length()))));
+
+        boolean hasPlaceholder = output.contains("(서명 또는 인)") || output.matches("(?s).*\\(서명\\s*또는\\s*인\\).*");
+        System.out.println("[SIGN] HTML contains placeholder '(서명 또는 인)': " + hasPlaceholder);
 
         if (!supplierImg.isEmpty()) {
             output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", Matcher.quoteReplacement(supplierImg));
@@ -373,8 +389,11 @@ public class FileDownloadController {
             byte[] imageBytes = Base64.getMimeDecoder().decode(payload);
             Path signPath = pdfFolder1.resolve(filename + "-" + role + "." + ext).normalize();
             Files.write(signPath, imageBytes);
+            System.out.println("[SIGN] " + role + " image saved: " + signPath + " (" + imageBytes.length + " bytes)");
             return signPath.toUri().toString();
-        } catch (IllegalArgumentException | IOException ignored) {
+        } catch (IllegalArgumentException | IOException e) {
+            System.out.println("[SIGN] ERROR writing " + role + " image: " + e.getMessage());
+            e.printStackTrace();
             return "";
         }
     }
@@ -606,6 +625,13 @@ public class FileDownloadController {
             // HTML Pipeline 생성
             HtmlPipelineContext htmlPipelineContext = new HtmlPipelineContext(cssAppliers);
             htmlPipelineContext.setTagFactory(Tags.getHtmlTagProcessorFactory());
+            // file:// URI 이미지 로드를 위한 ImageProvider 설정
+            htmlPipelineContext.setImageProvider(new AbstractImageProvider() {
+                @Override
+                public String getImageRootPath() {
+                    return pdfFolder1.toAbsolutePath().toString() + File.separator;
+                }
+            });
 
             // ========================================================================================
             // Pipelines
