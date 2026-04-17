@@ -11,3 +11,4 @@ logging:
   config: classpath:config/logback-api-dev.xml
 gas-max:
   session-timeout: 6h
+  download-base-url: http://gas.joaoffice.com:14013

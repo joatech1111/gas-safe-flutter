@@ -30,6 +30,7 @@ import java.util.HashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -96,6 +97,10 @@ public class SafeCheckController {
 
 	@Autowired
 	private FileDownloadController fileDownloadController;
+
+	@Value("${gas-max.download-base-url:http://121.254.173.234:9999}")
+	private String downloadBaseUrl;
+
 	/*================================================================
 	 * Public Rest API
 	 ================================================================*/
@@ -1697,8 +1702,7 @@ public class SafeCheckController {
 
 			fileDownloadController.createPDF(randomString.toString(), anCont);
 
-			//String CONT_FILE_URL = "http://118.222.92.10:9494/download/" + randomString.toString() + ".pdf";
-			String CONT_FILE_URL = "http://121.254.173.234:9999/download/" + randomString.toString() + ".pdf";
+			String CONT_FILE_URL = downloadBaseUrl + "/download/" + randomString.toString() + ".pdf";
 
 
 

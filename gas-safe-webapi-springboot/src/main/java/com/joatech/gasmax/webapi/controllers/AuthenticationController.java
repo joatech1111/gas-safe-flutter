@@ -7,6 +7,7 @@ import java.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -42,6 +43,9 @@ public class AuthenticationController {
     @Autowired
     private UserSessionService userSessionService;
 
+    @Value("${gas-max.download-base-url:http://121.254.173.234:9999}")
+    private String downloadBaseUrl;
+
     /*================================================================
      * Public Rest API
      ================================================================*/
@@ -57,8 +61,7 @@ public class AuthenticationController {
             char randomChar = (char) (random.nextInt(26) + 'a' + (random.nextBoolean() ? 0 : 'A' - 'a'));
             randomString.append(randomChar);
         }
-        //String CONT_FILE_URL = "http://118.222.92.10:9494/download/" + randomString.toString() + ".pdf";
-        String CONT_FILE_URL = "http://121.254.173.234:9999/download/" + randomString.toString() + ".pdf";
+        String CONT_FILE_URL = downloadBaseUrl + "/download/" + randomString.toString() + ".pdf";
 
         return "Random string [ " + CONT_FILE_URL + "]";
 
