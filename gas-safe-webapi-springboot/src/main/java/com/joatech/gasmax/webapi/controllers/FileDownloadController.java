@@ -363,8 +363,24 @@ public class FileDownloadController {
         System.out.println("[SIGN] supplierImg tag: " + (supplierImg.isEmpty() ? "(empty)" : supplierImg.substring(0, Math.min(80, supplierImg.length()))));
         System.out.println("[SIGN] customerImg tag: " + (customerImg.isEmpty() ? "(empty)" : customerImg.substring(0, Math.min(80, customerImg.length()))));
 
-        // &nbsp; 또는 일반 공백 모두 매칭하는 패턴
-        String signPlaceholderRegex = "\\(서명(?:\\s|&nbsp;)*또는(?:\\s|&nbsp;)*인\\)";
+        // HTML에서 서명 placeholder 위치 디버깅
+        int idx서명 = output.indexOf("서명");
+        System.out.println("[SIGN] indexOf '서명' = " + idx서명);
+        if (idx서명 > -1) {
+            int start = Math.max(0, idx서명 - 5);
+            int end = Math.min(output.length(), idx서명 + 30);
+            String snippet = output.substring(start, end);
+            System.out.println("[SIGN] context around first '서명': [" + snippet + "]");
+            // hex dump for invisible chars
+            StringBuilder hex = new StringBuilder();
+            for (char c : snippet.toCharArray()) {
+                hex.append(String.format("%04x ", (int) c));
+            }
+            System.out.println("[SIGN] hex: " + hex);
+        }
+
+        // 다양한 패턴 시도
+        String signPlaceholderRegex = "\\(서명(?:\\s|&nbsp;|\\u00a0)*또는(?:\\s|&nbsp;|\\u00a0)*인\\)";
 
         boolean hasPlaceholder = java.util.regex.Pattern.compile(signPlaceholderRegex).matcher(output).find();
         System.out.println("[SIGN] HTML contains signature placeholder: " + hasPlaceholder);
