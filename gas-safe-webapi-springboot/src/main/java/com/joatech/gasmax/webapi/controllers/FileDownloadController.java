@@ -8,7 +8,10 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.beans.Expression;
 import java.io.IOException;
@@ -50,11 +53,14 @@ import com.itextpdf.tool.xml.pipeline.end.PdfWriterPipeline;
 import com.itextpdf.tool.xml.pipeline.html.AbstractImageProvider;
 import com.itextpdf.tool.xml.pipeline.html.HtmlPipeline;
 import com.itextpdf.tool.xml.pipeline.html.HtmlPipelineContext;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import com.joatech.gasmax.webapi.domains.AnCont;
 import com.joatech.gasmax.webapi.services.AnContService;
 
+import java.util.Map;
+import java.util.HashMap;
 
 @RestController
 public class FileDownloadController {
@@ -64,6 +70,43 @@ public class FileDownloadController {
     private final Path pdfFolder = Paths.get(System.getProperty("user.dir"), "cont_doc");
     private final Path pdfFolder1 = Paths.get(System.getProperty("user.dir"), "AnCont_pdf");
 
+    @Value("${gas-max.download-base-url:http://gas.joaoffice.com:14013}")
+    private String downloadBaseUrl;
+
+    /**
+     * 클라이언트에서 생성한 PDF 파일 업로드
+     * POST /upload/contract-pdf?filename=xxx
+     */
+    @PostMapping("/upload/contract-pdf")
+    public ResponseEntity<Map<String, String>> uploadContractPdf(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam("filename") String filename) {
+        try {
+            // 파일명 정리 (.pdf 확장자 보장)
+            String safeName = filename.replaceAll("[^a-zA-Z0-9_\\-]", "");
+            if (safeName.isEmpty()) safeName = "contract_" + System.currentTimeMillis();
+            String pdfFilename = safeName + ".pdf";
+
+            // AnCont_pdf 디렉토리에 저장
+            Path target = pdfFolder1.resolve(pdfFilename).normalize();
+            Files.createDirectories(target.getParent());
+            file.transferTo(target.toFile());
+
+            // 다운로드 URL 생성
+            String downloadUrl = downloadBaseUrl + "/download/" + pdfFilename;
+
+            Map<String, String> result = new HashMap<>();
+            result.put("url", downloadUrl);
+            result.put("filename", pdfFilename);
+            System.out.println("[UPLOAD] PDF saved: " + target + " -> " + downloadUrl);
+            return ResponseEntity.ok(result);
+        } catch (IOException e) {
+            e.printStackTrace();
+            Map<String, String> error = new HashMap<>();
+            error.put("error", "파일 저장 실패: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(error);
+        }
+    }
 
     @GetMapping("/download/{filename}")
     public ResponseEntity<Resource> downloadFile(@PathVariable String filename) throws IOException {

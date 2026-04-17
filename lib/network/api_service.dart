@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -281,4 +282,23 @@ class ApiService {
 
   Future<Map<String, dynamic>> safetyStatusSearchLocation(Map<String, dynamic> req) =>
       _request(() => _dio.post('safetycheck/status/search/location', data: req));
+
+  /// 클라이언트에서 생성한 PDF를 서버에 업로드
+  Future<Map<String, dynamic>> uploadContractPdf(Uint8List pdfBytes, String filename) async {
+    try {
+      final formData = FormData.fromMap({
+        'file': MultipartFile.fromBytes(pdfBytes, filename: '$filename.pdf'),
+        'filename': filename,
+      });
+      final uploadUrl = '${NetConfig.serverRootUrl}/upload/contract-pdf';
+      final response = await _dioLong.post(uploadUrl, data: formData);
+      final data = response.data;
+      if (data is Map<String, dynamic>) return {'resultCode': 0, 'resultData': data};
+      return {'resultCode': 0, 'resultData': json.decode(data.toString())};
+    } on DioException catch (e) {
+      return {'resultCode': 9999, 'result': _toKoreanError(e)};
+    } catch (e) {
+      return {'resultCode': 9999, 'result': 'PDF 업로드 실패: $e'};
+    }
+  }
 }

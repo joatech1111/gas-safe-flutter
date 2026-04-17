@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/safety_customer_result_data.dart';
 import '../../models/safety_check_contract_result_data.dart';
 import '../../network/net_helper.dart';
+import '../../services/contract_pdf_service.dart';
 import '../../utils/app_state.dart';
 import '../../utils/date_util.dart';
 import '../../utils/keys.dart';
@@ -218,6 +219,56 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     Position? pos;
     try { pos = await Geolocator.getCurrentPosition(); } catch (_) {}
 
+    // ─── 1. 클라이언트에서 PDF 생성 ───
+    String pdfUrl = _pdfFileUrl ?? '';
+    try {
+      final pdfData = ContractPdfData(
+        comNo: _comNoController.text,
+        comName: _comNameController.text,
+        comTel: _comTelController.text,
+        comHp: _comHpController.text,
+        comCeoName: _comCeoNameController.text,
+        custComNo: _custComNoController.text,
+        custComName: _custComNameController.text,
+        custTel: _custTelController.text,
+        cuGongName: _cuGongNameController.text,
+        cuAddr1: _cuAddr1,
+        cuAddr2: _cuAddr2,
+        cuGongNo: _cuGongNo.isNotEmpty ? _cuGongNo : _contractNoController.text,
+        anzDate: _ensureDate(_anzDateController.text, DateUtil.today()),
+        anzDateF: _ensureDate(_anzDateFController.text, DateUtil.today()),
+        anzDateT: _ensureDate(_anzDateTController.text, DateUtil.afterDays(365)),
+        saleType: _saleType,
+        contType: _contType,
+        useCyl: _cylController.text,
+        useMeter: _meterController.text,
+        useTrans: _transController.text,
+        useVapor: _vaporController.text,
+        usePipe: _pipeController.text,
+        useFacility: _facilityController.text,
+        centerSi: _centerSiController.text,
+        centerConsumer: _centerConsumerController.text,
+        centerKgs: _centerKgsController.text,
+        centerGas: _centerGasController.text,
+        supplierSign: comSign.isNotEmpty ? comSign : null,
+        customerSign: custSign.isNotEmpty ? custSign : null,
+      );
+
+      final pdfBytes = await ContractPdfService.generate(pdfData);
+      final filename = _generatePdfFilename();
+
+      // ─── 2. PDF 서버 업로드 ───
+      final uploadResp = await NetHelper.api.uploadContractPdf(pdfBytes, filename);
+      if (uploadResp['resultCode'] == 0 && uploadResp['resultData'] != null) {
+        pdfUrl = uploadResp['resultData']['url'] ?? pdfUrl;
+        _pdfFileUrl = pdfUrl;
+      }
+    } catch (e) {
+      debugPrint('[PDF] 생성/업로드 실패: $e');
+      // PDF 실패해도 계약 저장은 계속 진행
+    }
+
+    // ─── 3. 계약 데이터 저장 ───
     final req = {
       'AREA_CODE': widget.customer.areaCode ?? AppState.areaCode,
       'ANZ_Cu_Code': widget.customer.cuCode,
@@ -250,7 +301,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       'CUST_TEL': _custTelController.text,
       'CU_GONGNAME': _cuGongNameController.text,
       'CUST_SIGN': custSign.isNotEmpty ? Keys.y : Keys.n,
-      'CONT_FILE_URL': _pdfFileUrl ?? '',
+      'CONT_FILE_URL': pdfUrl,
       'ANZ_CU_Confirm_TEL': _anzCuConfirmTelController.text,
       'ANZ_CU_SMS_YN': sendSMS ? Keys.y : Keys.n,
       'REG_DT': '', 'REG_USER_ID': AppState.loginUserId,
@@ -274,8 +325,11 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       final rd = resp['resultData'];
       if (rd != null) {
         if (rd['po_ANZ_Sno'] != null) { _anzSno = rd['po_ANZ_Sno'].toString(); _isNew = false; }
-        if (rd['po_CONT_FILE_URL'] != null) { _pdfFileUrl = rd['po_CONT_FILE_URL'].toString(); }
-        if (rd['CONT_FILE_URL'] != null && (rd['CONT_FILE_URL'].toString().trim().isNotEmpty)) {
+        // 서버에서 URL 반환하면 사용, 아니면 클라이언트에서 생성한 URL 유지
+        if (rd['po_CONT_FILE_URL'] != null && rd['po_CONT_FILE_URL'].toString().trim().isNotEmpty) {
+          _pdfFileUrl = rd['po_CONT_FILE_URL'].toString();
+        }
+        if (rd['CONT_FILE_URL'] != null && rd['CONT_FILE_URL'].toString().trim().isNotEmpty) {
           _pdfFileUrl = rd['CONT_FILE_URL'].toString();
         }
       }
@@ -287,6 +341,15 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     } else {
       NetHelper.handleError(context, resp);
     }
+  }
+
+  String _generatePdfFilename() {
+    final now = DateTime.now();
+    final ts = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}'
+               '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}'
+               '${now.second.toString().padLeft(2, '0')}';
+    final cuCode = widget.customer.cuCode ?? 'unknown';
+    return 'contract_${cuCode}_$ts';
   }
 
   Future<String?> _resolveContractFileUrl(Map<String, dynamic> req) async {
