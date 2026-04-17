@@ -104,7 +104,7 @@ public class FileDownloadController {
             e.printStackTrace();
             Map<String, String> error = new HashMap<>();
             error.put("error", "파일 저장 실패: " + e.getMessage());
-            return ResponseEntity.internalServerError().body(error);
+            return ResponseEntity.status(500).body(error);
         }
     }
 
