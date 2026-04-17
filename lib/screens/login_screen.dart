@@ -23,8 +23,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _idController = TextEditingController();
-  final _pwdController = TextEditingController();
+  final _idController = TextEditingController(text: 'test2');
+  final _pwdController = TextEditingController(text: 'test2');
   final _phoneController = TextEditingController();
   final _phonePwdController = TextEditingController();
   bool _saveLogin = false;
