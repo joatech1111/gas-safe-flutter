@@ -1143,6 +1143,19 @@ public class SafeCheckController {
 				Arrays.asList("앱없이보기", "앱없이 보기", "미리보기링크", "미리보기 링크", "preview_url"),
 				previewUrl);
 
+		if (!contFileUrl.isEmpty()) {
+			boolean hasDownloadUrl = smsMsg.contains(contFileUrl);
+			boolean hasPreviewUrl = !previewUrl.isEmpty() && smsMsg.contains(previewUrl);
+			if (!hasDownloadUrl && !hasPreviewUrl) {
+				StringBuilder sb = new StringBuilder(smsMsg);
+				sb.append("\n\n[가스안전점검표]\n다운로드: ").append(contFileUrl);
+				if (!previewUrl.isEmpty()) {
+					sb.append("\n앱 없이 보기: ").append(previewUrl);
+				}
+				smsMsg = sb.toString();
+			}
+		}
+
 		smsNoticesList.put(smsMsgKey, smsMsg);
 	}
 
