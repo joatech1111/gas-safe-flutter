@@ -314,6 +314,7 @@ public class FileDownloadController {
         String out = html;
 
         // XMLWorker parses XHTML, so common void tags must be self-closing.
+        out = out.replaceAll("(?i)</br\\s*>", "");
         out = out.replaceAll("(?i)<br\\s*>", "<br/>");
         out = out.replaceAll("(?i)<hr\\s*>", "<hr/>");
         out = out.replaceAll("(?i)<img([^>]*?)(?<!/)>", "<img$1/>");
