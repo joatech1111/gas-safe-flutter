@@ -14,7 +14,7 @@ class NetHelper {
     Future<Map<String, dynamic>> Function() apiCall, {
     bool showProgress = true,
   }) async {
-    if (!context.mounted) return {'resultCode': 9999, 'result': 'Context not mounted'};
+    if (!context.mounted) return {'resultCode': 9999, 'result': '화면이 닫혀 요청을 처리할 수 없습니다.'};
 
     OverlayEntry? overlayEntry;
 

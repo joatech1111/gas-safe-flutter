@@ -365,6 +365,53 @@ public class AuthenticationController {
 
 
 	/**
+	 * 전화번호로 업체(사용자) 목록 조회 (비밀번호 없이)
+	 * Flutter 전화번호 로그인 1단계: 전화번호 입력 → 업체 목록 표시
+	 */
+	@PostMapping("searchByPhone")
+	public RestAPIResult searchByPhone(@RequestBody String jsonData) throws JsonParseException, IOException {
+
+		logger.debug("Start searchByPhone API : Received data - {}", jsonData);
+
+		ObjectMapper mapper = new ObjectMapper();
+		JsonNode jsonRootNode = mapper.readTree(jsonData);
+
+		JsonNode jsonNode = jsonRootNode.get("phoneNumber");
+		if (jsonNode == null) {
+			return new RestAPIResult(GasMaxErrors.ERROR_LOGIN_INFORMAION_NOT_SUMBITED + " phoneNumber",
+					GasMaxErrors.ERROR_CODE_LOGIN_INFORMAION_NOT_SUMBITED, "");
+		}
+		String phoneNumber = jsonNode.asText();
+
+		// 전화번호로 사용자 목록 조회
+		List<AppUserSafe> userList = new ArrayList<>();
+		try {
+			userList = appUserSafeService.getAppUserSafeListByHpSNo(phoneNumber);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		if (userList.isEmpty()) {
+			return new RestAPIResult("등록되지 않은 전화번호입니다.",
+					GasMaxErrors.ERROR_CODE_LOGIN_INFO_NOT_FOUND, "");
+		}
+
+		// 사용자 목록 반환 (단일이든 복수든 List로)
+		List<Map<String, String>> userInfoList = new ArrayList<>();
+		for (AppUserSafe u : userList) {
+			Map<String, String> info = new HashMap<>();
+			info.put("HP_IMEI", u.getHpImei());
+			info.put("Login_Name", u.getLoginName());
+			info.put("Login_User", u.getLoginUser());
+			info.put("Login_Co", u.getLoginCo());
+			info.put("HP_Model", u.getHpModel());
+			userInfoList.add(info);
+		}
+
+		return new RestAPIResult(GasMaxErrors.ERROR_OK, GasMaxErrors.ERROR_CODE_OK, userInfoList);
+	}
+
+	/**
 	 * 전화번호 + 비밀번호 기반 로그인
 	 * 전화번호(HP_SNO)로 사용자를 조회 후 비밀번호 검증하여 로그인 처리
 	 * 복수 사용자인 경우: selectedImei 없으면 사용자 목록 반환 (resultCode=200)

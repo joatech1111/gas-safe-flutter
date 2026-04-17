@@ -67,7 +67,7 @@ class ApiService {
       final data = response.data;
       if (data is Map<String, dynamic>) return data;
       if (data is String) return json.decode(data);
-      return {'resultCode': 9999, 'result': 'Unknown response format'};
+      return {'resultCode': 9999, 'result': '서버 응답 형식을 인식할 수 없습니다.'};
     } on DioException catch (e) {
       if (e.response != null && e.response!.data != null) {
         try {
@@ -75,9 +75,34 @@ class ApiService {
           return json.decode(e.response!.data.toString());
         } catch (_) {}
       }
-      return {'resultCode': 9999, 'result': e.message ?? '네트워크 연결에 실패했습니다.'};
+      return {'resultCode': 9999, 'result': _toKoreanError(e)};
     } catch (e) {
-      return {'resultCode': 9999, 'result': e.toString()};
+      return {'resultCode': 9999, 'result': '알 수 없는 오류가 발생했습니다.'};
+    }
+  }
+
+  /// DioException → 한글 에러 메시지
+  static String _toKoreanError(DioException e) {
+    switch (e.type) {
+      case DioExceptionType.connectionTimeout:
+        return '서버 연결 시간이 초과되었습니다.\n네트워크 상태를 확인해주세요.';
+      case DioExceptionType.sendTimeout:
+        return '데이터 전송 시간이 초과되었습니다.';
+      case DioExceptionType.receiveTimeout:
+        return '서버 응답 시간이 초과되었습니다.';
+      case DioExceptionType.connectionError:
+        return '서버에 연결할 수 없습니다.\n네트워크 연결을 확인해주세요.';
+      case DioExceptionType.badResponse:
+        final statusCode = e.response?.statusCode ?? 0;
+        if (statusCode == 401) return '인증이 만료되었습니다. 다시 로그인해주세요.';
+        if (statusCode == 403) return '접근 권한이 없습니다.';
+        if (statusCode == 404) return '요청한 정보를 찾을 수 없습니다.';
+        if (statusCode >= 500) return '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+        return '서버 요청 실패 (오류코드: $statusCode)';
+      case DioExceptionType.cancel:
+        return '요청이 취소되었습니다.';
+      default:
+        return '네트워크 연결에 실패했습니다.';
     }
   }
 
@@ -87,6 +112,13 @@ class ApiService {
 
   Future<Map<String, dynamic>> authLoginByPhone(Map<String, dynamic> req) =>
       _request(() => _dio.post('auth/loginByPhone', data: req));
+
+  /// 전화번호로 업체 목록 조회 (비밀번호 없이)
+  Future<Map<String, dynamic>> authSearchByPhone(String phoneNumber) =>
+      _request(() => _dio.post('auth/searchByPhone', data: {
+        'phoneNumber': phoneNumber,
+        'appVersion': '3.0.1010',
+      }));
 
   Future<Map<String, dynamic>> authLogout() =>
       _request(() => _dio.get('auth/logout'));
