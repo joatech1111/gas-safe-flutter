@@ -268,7 +268,7 @@ public class FileDownloadController {
             2. xml 기준 html 태그 확인( ex : <p> </p> , <img/> , <col/> )
             위 조건을 지키지 않을 경우 DocumentException 발생
             */
-            String htmlStr = AnContfiles(ContData);
+            String htmlStr = buildTwoPageContractHtml(ContData);
 
             // HTML 내용을 PDF 파일에 삽입
             StringReader stringReader = new StringReader(htmlStr);
@@ -302,6 +302,25 @@ public class FileDownloadController {
         }
 
     }
+
+    private String buildTwoPageContractHtml(AnCont contData) {
+        String front = AnContfiles(contData);
+        String back = AnContfile2();
+
+        if (front == null) front = "";
+        if (back == null || back.trim().isEmpty()) return front;
+
+        String normalizedFront = front
+                .replaceAll("(?i)</body>\\s*</html>\\s*$", "")
+                .replaceAll("(?i)</body>\\s*$", "")
+                .replaceAll("(?i)</html>\\s*$", "");
+
+        return normalizedFront
+                + "<div style='page-break-before: always;'></div>"
+                + back
+                + "</body></html>";
+    }
+
     public String AnContfiles(AnCont contData){
 
 
