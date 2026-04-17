@@ -325,12 +325,36 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     return null;
   }
 
+  String _replaceTemplateTokens(String message, List<String> keys, String value) {
+    var result = message;
+    for (final key in keys) {
+      final escaped = RegExp.escape(key);
+      result = result.replaceAll(
+        RegExp('\\{\\s*$escaped\\s*\\}', caseSensitive: false),
+        value,
+      );
+      result = result.replaceAll(
+        RegExp('\\[\\s*$escaped\\s*\\]', caseSensitive: false),
+        value,
+      );
+    }
+    return result;
+  }
+
   Future<void> _sendSMS({String? contractUrl}) async {
     final areaCode = widget.customer.areaCode ?? AppState.areaCode;
     final normalizedContractUrl = (contractUrl ?? _pdfFileUrl ?? '').trim();
     final gUrl = normalizedContractUrl.isEmpty
         ? ''
         : 'https://docs.google.com/gview?embedded=true&url=${Uri.encodeComponent(normalizedContractUrl)}';
+    final customerName =
+        (widget.customer.cuNameView ?? widget.customer.cuName ?? '').trim();
+    final contractName = _cuGongNameController.text.trim().isNotEmpty
+        ? _cuGongNameController.text.trim()
+        : customerName;
+    final address = '$_cuAddr1 $_cuAddr2'
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
     final smsResp = await NetHelper.api.safetySms(
       areaCode,
       Keys.smsDivContract,
@@ -343,24 +367,36 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     if (NetHelper.isSuccess(smsResp) && smsResp['resultData'] != null) {
       smsMsg = smsResp['resultData']['SMS_Msg']?.toString() ?? '';
     }
-    smsMsg = smsMsg
-        .replaceAll('{공급자상호}', _comNameController.text)
-        .replaceAll('{거래처명}', widget.customer.cuNameView ?? widget.customer.cuName ?? '')
-        .replaceAll('{영업소코드}', areaCode)
-        .replaceAll('{거래처코드}', widget.customer.cuCode ?? '')
-        .replaceAll('{주소}', '$_cuAddr1 $_cuAddr2')
-        .replaceAll('{계약일}', _anzDateController.text)
-        .replaceAll('{점검자}', AppState.safeSwName)
-        .replaceAll('{점검원}', AppState.safeSwName)
-        .replaceAll('{CONT_FILE_URL}', normalizedContractUrl)
-        .replaceAll('{PDF_URL}', normalizedContractUrl)
-        .replaceAll('{DOWNLOAD_URL}', normalizedContractUrl)
-        .replaceAll('{계약서URL}', normalizedContractUrl)
-        .replaceAll('{계약서링크}', normalizedContractUrl)
-        .replaceAll('{계약서다운로드링크}', normalizedContractUrl)
-        .replaceAll('{다운로드링크}', normalizedContractUrl)
-        .replaceAll('{앱없이보기}', gUrl)
-        .replaceAll('{미리보기링크}', gUrl);
+    smsMsg = _replaceTemplateTokens(smsMsg, ['공급자상호'], _comNameController.text);
+    smsMsg = _replaceTemplateTokens(smsMsg, ['거래처명', '고객명'], customerName);
+    smsMsg = _replaceTemplateTokens(smsMsg, ['계약자명', '계약자'], contractName);
+    smsMsg = _replaceTemplateTokens(smsMsg, ['영업소코드'], areaCode);
+    smsMsg = _replaceTemplateTokens(smsMsg, ['거래처코드'], widget.customer.cuCode ?? '');
+    smsMsg = _replaceTemplateTokens(smsMsg, ['주소', '거래처주소'], address);
+    smsMsg = _replaceTemplateTokens(smsMsg, ['계약일'], _anzDateController.text);
+    smsMsg = _replaceTemplateTokens(smsMsg, ['점검자', '점검원'], AppState.safeSwName);
+    smsMsg = _replaceTemplateTokens(
+      smsMsg,
+      [
+        'CONT_FILE_URL',
+        'PDF_URL',
+        'DOWNLOAD_URL',
+        'download_url',
+        'cont_file_url',
+        '계약서URL',
+        '계약서링크',
+        '계약서다운로드링크',
+        '다운로드링크',
+        '다운로드 링크',
+        '다운링크',
+      ],
+      normalizedContractUrl,
+    );
+    smsMsg = _replaceTemplateTokens(
+      smsMsg,
+      ['앱없이보기', '앱없이 보기', '미리보기링크', '미리보기 링크', 'preview_url'],
+      gUrl,
+    );
     if (normalizedContractUrl.isNotEmpty &&
         !smsMsg.contains(normalizedContractUrl) &&
         !smsMsg.contains(gUrl)) {
