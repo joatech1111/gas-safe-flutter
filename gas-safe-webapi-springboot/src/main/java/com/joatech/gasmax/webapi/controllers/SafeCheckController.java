@@ -27,6 +27,7 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.regex.Pattern;
+import java.util.concurrent.ConcurrentHashMap;
 
 import java.util.HashMap;
 
@@ -91,6 +92,7 @@ public class SafeCheckController {
 	 * Private Members
 	 ================================================================*/
 	private final Logger logger = LoggerFactory.getLogger(getClass());
+	private final Map<String, ContractContext> lastContractContextBySession = new ConcurrentHashMap<>();
 
 	/*================================================================
 	 * Private Autowired Members
@@ -1023,6 +1025,7 @@ public class SafeCheckController {
 
 			String resolvedContFileUrl = resolveContractFileUrl(
 					appUserSafe,
+					sessionId,
 					areaCode,
 					optContFileUrl.orElse(""),
 					optAnzCuCode.orElse(""),
@@ -1047,12 +1050,25 @@ public class SafeCheckController {
 
 	private String resolveContractFileUrl(
 			AppUserSafe appUserSafe,
+			String sessionId,
 			String areaCode,
 			String contFileUrl,
 			String anzCuCode,
 			String anzSno) {
 		String resolved = contFileUrl == null ? "" : contFileUrl.trim();
 		if (!resolved.isEmpty()) return resolved;
+		if (anzCuCode == null || anzCuCode.trim().isEmpty()) {
+			ContractContext context = lastContractContextBySession.get(sessionId);
+			if (context != null) {
+				if (areaCode == null || areaCode.trim().isEmpty()) {
+					areaCode = context.areaCode;
+				}
+				anzCuCode = context.anzCuCode;
+				if (anzSno == null || anzSno.trim().isEmpty()) {
+					anzSno = context.anzSno;
+				}
+			}
+		}
 		if (anzCuCode == null || anzCuCode.trim().isEmpty()) return "";
 
 		AnContService anContService = null;
@@ -1183,6 +1199,40 @@ public class SafeCheckController {
 			output = output.replaceAll("(?i)\\$\\s*" + escapedKey + "\\s*\\$", value);
 		}
 		return output;
+	}
+
+	private String generateContractPdfFileName() {
+		Random random = new Random();
+		int length = 15;
+		StringBuilder randomString = new StringBuilder();
+		for (int i = 0; i < length; i++) {
+			char randomChar = (char) (random.nextInt(26) + 'a' + (random.nextBoolean() ? 0 : 'A' - 'a'));
+			randomString.append(randomChar);
+		}
+		return randomString.toString();
+	}
+
+	private void rememberContractContext(String sessionId, String areaCode, String anzCuCode, String anzSno) {
+		if (sessionId == null || sessionId.trim().isEmpty()) return;
+		if (anzCuCode == null || anzCuCode.trim().isEmpty()) return;
+		lastContractContextBySession.put(
+				sessionId,
+				new ContractContext(
+						areaCode == null ? "" : areaCode.trim(),
+						anzCuCode.trim(),
+						anzSno == null ? "" : anzSno.trim()));
+	}
+
+	private static final class ContractContext {
+		private final String areaCode;
+		private final String anzCuCode;
+		private final String anzSno;
+
+		private ContractContext(String areaCode, String anzCuCode, String anzSno) {
+			this.areaCode = areaCode;
+			this.anzCuCode = anzCuCode;
+			this.anzSno = anzSno;
+		}
 	}
 
 	/*
@@ -1758,6 +1808,7 @@ public class SafeCheckController {
 			mapResult.put("data", listResult);
 			mapResult.put("sign", sign);
 			mapResult.put("sign1", sign1);
+			rememberContractContext(sessionId, areaCode, anzCuCode, anzSno);
 
 			resultData = mapResult;
 		}
@@ -1804,6 +1855,7 @@ public class SafeCheckController {
 				sign = anSobiSignService.getSignByAreaCodeAndAnzCuCodeAndAnzSno(areaCode, anzCuCode, "C"+anzSno);
 				sign1 = anSobiSignService.getSignByAreaCodeAndAnzCuCodeAndAnzSno(areaCode, anzCuCode, "P"+anzSno);
 				anSobiSignService.close();
+				rememberContractContext(sessionId, areaCode, anzCuCode, anzSno);
 			}
 
 			Map<String, Object> mapResult = new HashMap<String, Object>();
@@ -1960,6 +2012,13 @@ public class SafeCheckController {
 
 			// Read json data
 			AnCont anCont = parseJsonAnCont(false, jsonData);
+			String contFileUrl = anCont.getContFileUrl() == null ? "" : anCont.getContFileUrl().trim();
+			if (contFileUrl.isEmpty()) {
+				String generatedFileName = generateContractPdfFileName();
+				fileDownloadController.createPDF(generatedFileName, anCont);
+				contFileUrl = "http://gas.joaoffice.com:14013/download/" + generatedFileName + ".pdf";
+				anCont.setContFileUrl(contFileUrl);
+			}
 			AnContService anContService = new AnContService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> mapResult = anContService.updateAnCont(anCont);
 			anContService.close();
@@ -1999,6 +2058,9 @@ public class SafeCheckController {
 			if (intResult == 0) {
 				mapResult.clear();
 				mapResult.put("po_CONTRACT_INFO", "E01 공급계약 수정오류.");
+			}
+			if (contFileUrl != null && !contFileUrl.isEmpty()) {
+				mapResult.put("po_CONT_FILE_URL", contFileUrl);
 			}
 			resultData = mapResult;
 		}
