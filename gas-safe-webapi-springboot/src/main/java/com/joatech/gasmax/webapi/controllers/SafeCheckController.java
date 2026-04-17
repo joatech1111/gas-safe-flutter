@@ -991,6 +991,8 @@ public class SafeCheckController {
 			@PathVariable("sms_div") String smsDiv,
 			@RequestParam(value = "cont_file_url", required = false) Optional<String> optContFileUrl,
 			@RequestParam(value = "preview_url", required = false) Optional<String> optPreviewUrl,
+			@RequestParam(value = "anz_cu_code", required = false) Optional<String> optAnzCuCode,
+			@RequestParam(value = "anz_sno", required = false) Optional<String> optAnzSno,
 			@RequestParam(value = "supplier_name", required = false) Optional<String> optSupplierName,
 			@RequestParam(value = "customer_name", required = false) Optional<String> optCustomerName,
 			@RequestParam(value = "contract_name", required = false) Optional<String> optContractName,
@@ -1018,9 +1020,17 @@ public class SafeCheckController {
 			SMSNoticesService smsNoticesService = new SMSNoticesService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> smsNoticesList = smsNoticesService.getSMSNoticesByAreaCodeAndSmsDiv(areaCode, smsDiv);
 			smsNoticesService.close();
+
+			String resolvedContFileUrl = resolveContractFileUrl(
+					appUserSafe,
+					areaCode,
+					optContFileUrl.orElse(""),
+					optAnzCuCode.orElse(""),
+					optAnzSno.orElse(""));
+
 			applySmsPlaceholders(
 					smsNoticesList,
-					optContFileUrl,
+					Optional.ofNullable(resolvedContFileUrl),
 					optPreviewUrl,
 					optSupplierName,
 					optCustomerName,
@@ -1033,6 +1043,47 @@ public class SafeCheckController {
 
 		RestAPIResult apiResult = new RestAPIResult(result, resultCode, resultData);
 		return apiResult;
+	}
+
+	private String resolveContractFileUrl(
+			AppUserSafe appUserSafe,
+			String areaCode,
+			String contFileUrl,
+			String anzCuCode,
+			String anzSno) {
+		String resolved = contFileUrl == null ? "" : contFileUrl.trim();
+		if (!resolved.isEmpty()) return resolved;
+		if (anzCuCode == null || anzCuCode.trim().isEmpty()) return "";
+
+		AnContService anContService = null;
+		try {
+			anContService = new AnContService(
+					appUserSafe.getServerIp(),
+					Integer.parseInt(appUserSafe.getServerPort()),
+					appUserSafe.getServerDBName(),
+					appUserSafe.getServerUser(),
+					appUserSafe.getServerPassword());
+
+			List<Map<String, Object>> listResult;
+			if (anzSno != null && !anzSno.trim().isEmpty()) {
+				listResult = anContService.getAnContServiceBy(areaCode, anzCuCode.trim(), anzSno.trim());
+			} else {
+				listResult = anContService.getLastAnContServiceBy(areaCode, anzCuCode.trim());
+			}
+
+			if (listResult != null && !listResult.isEmpty()) {
+				Object urlObj = listResult.get(0).get("CONT_FILE_URL");
+				if (urlObj != null) {
+					resolved = urlObj.toString().trim();
+				}
+			}
+		} catch (Exception e) {
+			logger.warn("Failed to resolve contract file url for sms. areaCode={}, anzCuCode={}, anzSno={}",
+					areaCode, anzCuCode, anzSno, e);
+		} finally {
+			if (anContService != null) anContService.close();
+		}
+		return resolved;
 	}
 
 	private void applySmsPlaceholders(
