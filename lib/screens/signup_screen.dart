@@ -18,8 +18,12 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final _idController = TextEditingController();
   final _passwordController = TextEditingController();
   final _passwordConfirmController = TextEditingController();
+  final _phoneController = TextEditingController();
   bool _phoneAgreed = false;
   String _uuid = '';
+  bool _isIOS = false;
+
+  static const _phoneChannel = MethodChannel('com.joatech.gassafe/phone');
 
   @override
   void initState() {
@@ -31,14 +35,32 @@ class _SignUpScreenState extends State<SignUpScreen> {
     try {
       final deviceInfo = DeviceInfoPlugin();
       if (Theme.of(context).platform == TargetPlatform.iOS) {
+        _isIOS = true;
         final iosInfo = await deviceInfo.iosInfo;
         _uuid = iosInfo.identifierForVendor ?? '';
       } else {
+        _isIOS = false;
         final androidInfo = await deviceInfo.androidInfo;
         _uuid = androidInfo.id;
+        // Android: 전화번호 자동 습득 시도
+        _tryGetPhoneNumber();
       }
       setState(() {});
     } catch (_) {}
+  }
+
+  /// Android에서 전화번호 자동 습득 시도
+  Future<void> _tryGetPhoneNumber() async {
+    try {
+      final phoneNumber = await _phoneChannel.invokeMethod<String>('getPhoneNumber');
+      if (phoneNumber != null && phoneNumber.isNotEmpty && mounted) {
+        setState(() {
+          _phoneController.text = phoneNumber.replaceAll('+82', '0').replaceAll('-', '');
+        });
+      }
+    } catch (_) {
+      // MethodChannel 미구현 또는 권한 없음 → 수동 입력
+    }
   }
 
   Future<void> _signUp() async {
@@ -67,6 +89,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
       Fluttertoast.showToast(msg: '비밀번호가 일치하지 않습니다.');
       return;
     }
+    final phone = _phoneController.text.trim().replaceAll('-', '');
+    if (phone.isEmpty) {
+      Fluttertoast.showToast(msg: '전화번호를 입력하세요.');
+      return;
+    }
 
     String model = '';
     try {
@@ -83,7 +110,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     final req = {
       'HP_IMEI': _uuid,
       'HP_Model': model,
-      'HP_SNO': '',
+      'HP_SNO': phone,
       'APP_VER': '3.0.1010',
       'Login_Co': _companyController.text.trim(),
       'Login_Name': _usernameController.text.trim(),
@@ -204,6 +231,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
               // 비밀번호 확인
               _buildInputField('비밀번호 확인', _passwordConfirmController, '비밀번호를 다시 입력하세요', obscure: true),
+              const SizedBox(height: 12),
+
+              // 전화번호
+              _buildPhoneField(),
               const SizedBox(height: 20),
 
               // 전화번호 수집 동의
@@ -263,6 +294,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
   }
 
+  Widget _buildPhoneField() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        const SizedBox(width: 90, child: Text('전화번호', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
+        Expanded(
+          child: SizedBox(
+            height: 44,
+            child: TextField(
+              controller: _phoneController,
+              keyboardType: TextInputType.phone,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+              decoration: InputDecoration(
+                hintText: _isIOS ? '전화번호를 입력하세요' : '자동입력 또는 직접 입력',
+                hintStyle: const TextStyle(fontSize: 13, color: Colors.grey),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                prefixIcon: const Icon(Icons.phone, size: 20),
+              ),
+              style: const TextStyle(fontSize: 14),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildInputField(String label, TextEditingController controller, String hint, {bool obscure = false}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -295,6 +353,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _idController.dispose();
     _passwordController.dispose();
     _passwordConfirmController.dispose();
+    _phoneController.dispose();
     super.dispose();
   }
 }

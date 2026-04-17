@@ -18,12 +18,27 @@ class SignaturePadState extends State<SignaturePad> {
   final List<List<Offset>> _strokes = [];
   List<Offset> _currentStroke = [];
   ui.Image? _bgImage;
+  bool _cleared = false;
 
   @override
   void initState() {
     super.initState();
     if (widget.initialSignature != null && widget.initialSignature!.isNotEmpty) {
       _loadInitialSignature(widget.initialSignature!);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant SignaturePad oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialSignature != widget.initialSignature) {
+      _strokes.clear();
+      _currentStroke.clear();
+      _bgImage = null;
+      _cleared = false;
+      if (widget.initialSignature != null && widget.initialSignature!.isNotEmpty) {
+        _loadInitialSignature(widget.initialSignature!);
+      }
     }
   }
 
@@ -36,7 +51,7 @@ class SignaturePadState extends State<SignaturePad> {
       final bytes = base64Decode(base64Str);
       final codec = await ui.instantiateImageCodec(bytes);
       final frame = await codec.getNextFrame();
-      if (mounted) {
+      if (mounted && !_cleared) {
         setState(() => _bgImage = frame.image);
       }
     } catch (_) {}
@@ -49,6 +64,7 @@ class SignaturePadState extends State<SignaturePad> {
       _strokes.clear();
       _currentStroke.clear();
       _bgImage = null;
+      _cleared = true;
     });
   }
 

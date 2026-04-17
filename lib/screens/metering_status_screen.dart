@@ -17,8 +17,11 @@ class MeteringStatusScreen extends StatefulWidget {
 
 class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
   final _searchController = TextEditingController();
+  final _buildingNameController = TextEditingController();
+  final _includeAddressController = TextEditingController();
   List<MetersCheckStatusResultData> _resultList = [];
   bool _isSearchExpanded = true;
+  bool _excludeRemoteMetering = false;
 
   ComboData? _selectedApt;
   ComboData? _selectedSw;
@@ -29,9 +32,53 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
   String _dateTo = DateUtil.today();
 
   @override
+  void initState() {
+    super.initState();
+    _loadSearchConditions();
+  }
+
+  Future<void> _loadSearchConditions() async {
+    final resp = await NetHelper.request(
+      context,
+      () => NetHelper.api.metersCustomerSearchCondition(AppState.areaCode),
+    );
+    if (!mounted) return;
+    if (NetHelper.isSuccess(resp) && resp['resultData'] != null) {
+      AppState.parseMetersCondition(resp['resultData']);
+      setState(() {
+        _selectedSw = _findComboByCode(AppState.comboSw, AppState.swCode);
+        _selectedMan = _findComboByCode(AppState.comboMan, AppState.gubunCode);
+        _selectedJy = _findComboByCode(AppState.comboJy, AppState.jyCode);
+        _selectedSort = _findComboByCode(AppState.comboSort, AppState.orderBy);
+      });
+    }
+  }
+
+  ComboData? _findComboByCode(List<ComboData> items, String code) {
+    if (code.trim().isEmpty) return null;
+    for (final item in items) {
+      if ((item.cd ?? '').trim() == code.trim() || (item.bigo ?? '').trim() == code.trim()) {
+        return item;
+      }
+    }
+    return null;
+  }
+
+  String _buildAppUser() {
+    final hpSno = (AppState.loginUser?.hpSno ?? '').trim();
+    final loginName = (AppState.loginUser?.loginName ?? '').trim();
+    final combined = '$hpSno$loginName';
+    return combined.isNotEmpty ? combined : AppState.loginUserId;
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CommonWidgets.buildAppBar(context, '검침현황'),
+      appBar: CommonWidgets.buildAppBar(context, '검침 현황'),
+      bottomNavigationBar: CommonWidgets.buildBottomStatusBar(
+        workerName: AppState.safeSwName,
+        rightText: '조회: ${_resultList.length}건',
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -88,8 +135,9 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
                       Expanded(
                         child: GestureDetector(
                           onTap: () async {
-                            final date = await showDatePicker(
-                              context: context, initialDate: CommonWidgets.buildDateField == null ? DateTime.now() : DateTime.now(),
+                            final date = await CommonWidgets.showKoreanDatePicker(
+                              context: context,
+                              initialDate: _parseYyyyMmDd(_dateFrom) ?? DateTime.now(),
                               firstDate: DateTime(2000), lastDate: DateTime(2100),
                             );
                             if (date != null) {
@@ -112,8 +160,9 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
                       Expanded(
                         child: GestureDetector(
                           onTap: () async {
-                            final date = await showDatePicker(
-                              context: context, initialDate: DateTime.now(),
+                            final date = await CommonWidgets.showKoreanDatePicker(
+                              context: context,
+                              initialDate: _parseYyyyMmDd(_dateTo) ?? DateTime.now(),
                               firstDate: DateTime(2000), lastDate: DateTime(2100),
                             );
                             if (date != null) {
@@ -138,20 +187,120 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
                   ),
                   const SizedBox(height: 6),
                   if (AppState.comboApt.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '건물명', items: AppState.comboApt, selectedItem: _selectedApt, onChanged: (v) => setState(() => _selectedApt = v)),
+                    Row(
+                      children: [
+                        const SizedBox(width: 80, child: Text('건물명', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                        Expanded(
+                          flex: 3,
+                          child: SizedBox(
+                            height: 36,
+                            child: TextField(
+                              controller: _buildingNameController,
+                              onChanged: (_) => setState(() {}),
+                              decoration: InputDecoration(
+                                hintText: '건물명',
+                                hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: Colors.grey.shade400)),
+                                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: Colors.grey.shade400)),
+                                isDense: true,
+                              ),
+                              style: const TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: _buildInlineDropdown(
+                            items: _filteredAptList,
+                            selectedItem: _selectedApt,
+                            onChanged: (v) => setState(() => _selectedApt = v),
+                          ),
+                        ),
+                      ],
+                    ),
                   if (AppState.comboApt.isNotEmpty) const SizedBox(height: 6),
-                  if (AppState.comboSw.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '담당사원', items: AppState.comboSw, selectedItem: _selectedSw, onChanged: (v) => setState(() => _selectedSw = v)),
-                  if (AppState.comboSw.isNotEmpty) const SizedBox(height: 6),
-                  if (AppState.comboMan.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '관리분류', items: AppState.comboMan, selectedItem: _selectedMan, onChanged: (v) => setState(() => _selectedMan = v)),
-                  if (AppState.comboMan.isNotEmpty) const SizedBox(height: 6),
-                  if (AppState.comboJy.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '지역분류', items: AppState.comboJy, selectedItem: _selectedJy, onChanged: (v) => setState(() => _selectedJy = v)),
-                  if (AppState.comboJy.isNotEmpty) const SizedBox(height: 6),
-                  if (AppState.comboSort.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '조회순서', items: AppState.comboSort, selectedItem: _selectedSort, onChanged: (v) => setState(() => _selectedSort = v), addAll: false),
-                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildLabeledDropdownField(
+                          label: '담당사원',
+                          items: AppState.comboSw,
+                          selectedItem: _selectedSw,
+                          onChanged: (v) => setState(() => _selectedSw = v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildLabeledDropdownField(
+                          label: '관리분류',
+                          items: AppState.comboMan,
+                          selectedItem: _selectedMan,
+                          onChanged: (v) => setState(() => _selectedMan = v),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildLabeledDropdownField(
+                          label: '지역분류',
+                          items: AppState.comboJy,
+                          selectedItem: _selectedJy,
+                          onChanged: (v) => setState(() => _selectedJy = v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const SizedBox(width: 60, child: Text('포함주소', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: SizedBox(
+                          height: 36,
+                          child: TextField(
+                            controller: _includeAddressController,
+                            decoration: InputDecoration(
+                              hintText: '포함주소',
+                              hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: Colors.grey.shade400)),
+                              enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(4), borderSide: BorderSide(color: Colors.grey.shade400)),
+                              isDense: true,
+                            ),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildLabeledDropdownField(
+                          label: '조회순서',
+                          items: AppState.comboSort,
+                          selectedItem: _selectedSort,
+                          onChanged: (v) => setState(() => _selectedSort = v),
+                          addAll: false,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('원격검침 거래처 제외', style: TextStyle(fontSize: 13)),
+                          value: _excludeRemoteMetering,
+                          onChanged: (v) => setState(() => _excludeRemoteMetering = v ?? false),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
                   CommonWidgets.buildSearchField(controller: _searchController, onSearch: _searchByKeyword, onGpsSearch: _searchByLocation),
                   const SizedBox(height: 8),
                 ],
@@ -164,7 +313,9 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
 
   Map<String, dynamic> _buildReq() => {
     'AREA_CODE': AppState.areaCode,
-    'FIND_STR': _searchController.text.trim(),
+    'FIND_STR': _searchController.text.trim().isNotEmpty
+        ? _searchController.text.trim()
+        : _buildingNameController.text.trim(),
     'GUM_DATE_F': _dateFrom,
     'GUM_DATE_T': _dateTo,
     'CU_CODE': '',
@@ -172,12 +323,101 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
     'SW_CD': _selectedSw?.cd ?? '',
     'MAN_CD': _selectedMan?.cd ?? '',
     'JY_CD': _selectedJy?.cd ?? '',
-    'ADDR_TEXT': '',
-    'SMART_METER_YN': '',
-    'OrderBy': _selectedSort?.cd ?? '',
-    'SAFE_CD': '',
-    'APP_User': AppState.loginUserId,
+    'ADDR_TEXT': _includeAddressController.text.trim(),
+    'SMART_METER_YN': _excludeRemoteMetering ? 'Y' : '',
+    'OrderBy': _selectedSort?.bigo ?? _selectedSort?.cd ?? '',
+    'SAFE_CD': AppState.safeSwCode,
+    'APP_User': _buildAppUser(),
   };
+
+  List<ComboData> get _filteredAptList {
+    final keyword = _buildingNameController.text.trim().toLowerCase();
+    if (keyword.isEmpty) return AppState.comboApt;
+    final filtered = AppState.comboApt.where((e) => e.getCdName().toLowerCase().contains(keyword)).toList();
+    return filtered.isEmpty ? AppState.comboApt : filtered;
+  }
+
+  DateTime? _parseYyyyMmDd(String value) {
+    if (value.length != 8) return null;
+    try {
+      return DateTime(
+        int.parse(value.substring(0, 4)),
+        int.parse(value.substring(4, 6)),
+        int.parse(value.substring(6, 8)),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildLabeledDropdownField({
+    required String label,
+    required List<ComboData> items,
+    required ComboData? selectedItem,
+    required ValueChanged<ComboData?> onChanged,
+    bool addAll = true,
+  }) {
+    return Row(
+      children: [
+        SizedBox(width: 60, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _buildInlineDropdown(
+            items: items,
+            selectedItem: selectedItem,
+            onChanged: onChanged,
+            addAll: addAll,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInlineDropdown({
+    required List<ComboData> items,
+    required ComboData? selectedItem,
+    required ValueChanged<ComboData?> onChanged,
+    bool addAll = true,
+  }) {
+    final allItems = <ComboData>[
+      if (addAll) ComboData(cdName: '전체'),
+      ...items,
+    ];
+    final selected = _findMatchingItem(allItems, selectedItem);
+    return Container(
+      height: 36,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<ComboData>(
+          isExpanded: true,
+          isDense: true,
+          value: selected,
+          items: allItems
+              .map(
+                (e) => DropdownMenuItem<ComboData>(
+                  value: e,
+                  child: Text(e.getCdName(), style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                ),
+              )
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  ComboData? _findMatchingItem(List<ComboData> items, ComboData? selected) {
+    if (items.isEmpty) return null;
+    if (selected == null) return items.first;
+    for (final item in items) {
+      if (item == selected) return item;
+    }
+    return items.first;
+  }
 
   Future<void> _searchByKeyword() async {
     final resp = await NetHelper.request(context, () => NetHelper.api.metersCheckStatusSearchKeyword(_buildReq()));
@@ -255,7 +495,7 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
                 child: Row(
                   children: [
                     _tableDataCell(item.cuNameView ?? item.cuName ?? '', flex: 3),
-                    _tableDataCell(DateUtil.toDisplay(item.appGjDate ?? ''), flex: 2),
+                    _tableDataCell(DateUtil.convertFormat(item.appGjDate ?? '', DateUtil.formatYyyymmdd, DateUtil.formatMmDd), flex: 2),
                     _tableDataCell(item.appGjGum ?? '', flex: 2),
                     _tableDataCell(item.appGjGage ?? '', flex: 2),
                     _tableDataCell(item.appGjJankg ?? '', flex: 2),
@@ -298,6 +538,8 @@ class _MeteringStatusScreenState extends State<MeteringStatusScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _buildingNameController.dispose();
+    _includeAddressController.dispose();
     super.dispose();
   }
 }

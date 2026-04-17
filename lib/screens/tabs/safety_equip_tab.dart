@@ -823,7 +823,7 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
           Expanded(child: Text(label, style: const TextStyle(fontSize: 11))),
           SizedBox(
             width: 80,
-            height: 30,
+            height: AppInput.height,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
@@ -942,7 +942,7 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
     final items = AppState.comboSw;
     if (items.isEmpty) return _SmallInput(controller: TextEditingController(text: AppState.safeSwName), readOnly: true);
     return Container(
-      height: 30,
+      height: AppInput.height,
       padding: const EdgeInsets.symmetric(horizontal: 6),
       decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
       child: DropdownButtonHideUnderline(
@@ -1035,42 +1035,17 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
   Widget _tableCellInput(TextEditingController ctrl) {
     return Padding(
       padding: const EdgeInsets.all(2),
-      child: SizedBox(
-        height: 28,
-        child: TextField(
-          controller: ctrl,
-          decoration: InputDecoration(
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(3)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 4), isDense: true,
-          ),
-          style: const TextStyle(fontSize: 11),
-        ),
-      ),
+      child: AppInput(controller: ctrl),
     );
   }
 
   Widget _tableCellInputWithUnit(TextEditingController ctrl, String unit) {
     return Padding(
       padding: const EdgeInsets.all(2),
-      child: SizedBox(
-        height: 28,
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: ctrl,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(3)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 4), isDense: true,
-                ),
-                style: const TextStyle(fontSize: 11),
-              ),
-            ),
-            const SizedBox(width: 2),
-            Text(unit, style: const TextStyle(fontSize: 9, color: Colors.black54)),
-          ],
-        ),
+      child: AppInput(
+        controller: ctrl,
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        suffixText: unit,
       ),
     );
   }
@@ -1080,20 +1055,20 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
     return Padding(
       padding: const EdgeInsets.all(2),
       child: SizedBox(
-        height: 28,
+        height: AppInput.height,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 3),
+          padding: const EdgeInsets.symmetric(horizontal: 8),
           decoration: BoxDecoration(
             border: Border.all(color: Colors.grey.shade400),
-            borderRadius: BorderRadius.circular(3),
+            borderRadius: BorderRadius.circular(AppInput.borderRadius),
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<int>(
               value: safeVal, isExpanded: true, isDense: true,
-              style: const TextStyle(fontSize: 11, color: Colors.black87),
+              style: TextStyle(fontSize: AppInput.fontSize, color: Colors.black87),
               items: items.asMap().entries.map((e) => DropdownMenuItem<int>(
                 value: e.key,
-                child: Text(e.value.isEmpty ? ' ' : e.value, style: const TextStyle(fontSize: 11)),
+                child: Text(e.value.isEmpty ? ' ' : e.value, style: TextStyle(fontSize: AppInput.fontSize)),
               )).toList(),
               onChanged: (v) { if (v != null) onChanged(v); },
             ),
@@ -1160,21 +1135,11 @@ class _SmallInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 30,
-      child: TextField(
-        controller: controller,
-        readOnly: readOnly,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(fontSize: 11, color: Colors.grey),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 6),
-          isDense: true,
-        ),
-        style: const TextStyle(fontSize: 12),
-      ),
+    return AppInput(
+      controller: controller,
+      hint: hint,
+      readOnly: readOnly,
+      keyboardType: keyboardType,
     );
   }
 }

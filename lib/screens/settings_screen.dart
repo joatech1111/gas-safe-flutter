@@ -4,6 +4,8 @@ import 'package:fluttertoast/fluttertoast.dart';
 import '../models/combo_data.dart';
 import '../network/net_helper.dart';
 import '../utils/app_state.dart';
+import '../utils/keys.dart';
+import '../utils/prefs_util.dart';
 import '../widgets/common_widgets.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -22,6 +24,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   ComboData? _selectedSort;
   ComboData? _selectedSafe;
   bool _isLoading = true;
+  bool _hideBottomNavigation = false;
 
   @override
   void initState() {
@@ -58,6 +61,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     // Set current selections
     _setCurrentSelections();
+    _hideBottomNavigation = PrefsUtil.getBool(Keys.prefHideBottomNav, defaultValue: false);
     setState(() => _isLoading = false);
   }
 
@@ -107,6 +111,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       user.safeSwCode = _selectedSafe?.cd ?? '';
       user.safeSwName = _selectedSafe?.getCdName() ?? '';
       AppState.setLoginUser(user);
+      await PrefsUtil.setBool(Keys.prefHideBottomNav, _hideBottomNavigation);
 
       Fluttertoast.showToast(msg: '설정이 저장되었습니다.');
       if (mounted) Navigator.pop(context);
@@ -119,6 +124,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CommonWidgets.buildAppBar(context, '설정'),
+      bottomNavigationBar: CommonWidgets.buildBottomStatusBar(
+        workerName: _selectedSafe?.getCdName() ?? AppState.safeSwName,
+      ),
       body: SafeArea(
         child: _isLoading
             ? Center(child: LogoLoader(size: 100))
@@ -126,13 +134,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Section 1: 사용자설정
-                  _sectionHeader('사용자설정'),
+                  // Section 1: 사용자정보
+                  _sectionHeader('사용자정보'),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Column(
                       children: [
-                        if (_areaList.isNotEmpty && (AppState.loginUser?.certAreaCode() ?? false))
+                        if (AppState.comboSafe.isNotEmpty)
+                          CommonWidgets.buildDropdown(label: '검침, 점검원', items: AppState.comboSafe, selectedItem: _selectedSafe, onChanged: (v) => setState(() => _selectedSafe = v), addAll: false),
+                        if (AppState.comboSafe.isNotEmpty) const SizedBox(height: 10),
+                        _buildReadOnlyField('사용자명', AppState.loginUser?.loginUser ?? ''),
+                        const SizedBox(height: 10),
+                        _buildReadOnlyField('비밀번호', AppState.loginUser?.loginPass ?? '', obscure: true),
+                        const SizedBox(height: 10),
+                      ],
+                    ),
+                  ),
+
+                  // Section 2: 거래처 검색 조건
+                  _sectionHeader('거래처 검색 조건'),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Column(
+                      children: [
+                        if (_areaList.isNotEmpty)
                           CommonWidgets.buildDropdown(
                             label: '영업소',
                             items: _areaList,
@@ -151,28 +176,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             addAll: false,
                           ),
                         if (_areaList.isNotEmpty) const SizedBox(height: 10),
-                        if (AppState.comboSafe.isNotEmpty && (AppState.loginUser?.certSafeSW() ?? false))
-                          CommonWidgets.buildDropdown(label: '안전점검자', items: AppState.comboSafe, selectedItem: _selectedSafe, onChanged: (v) => setState(() => _selectedSafe = v), addAll: false),
-                        if (AppState.comboSafe.isNotEmpty) const SizedBox(height: 10),
-                      ],
-                    ),
-                  ),
-
-                  // Section 2: 검색조건
-                  _sectionHeader('검색조건'),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Column(
-                      children: [
-                        if (AppState.comboSw.isNotEmpty && (AppState.loginUser?.certSW() ?? false))
+                        if (AppState.comboSw.isNotEmpty)
                           CommonWidgets.buildDropdown(label: '담당사원', items: AppState.comboSw, selectedItem: _selectedSw, onChanged: (v) => setState(() => _selectedSw = v), addAll: false),
                         if (AppState.comboSw.isNotEmpty) const SizedBox(height: 10),
-                        if (AppState.comboMan.isNotEmpty && (AppState.loginUser?.certGubun() ?? false))
+                        if (AppState.comboMan.isNotEmpty)
                           CommonWidgets.buildDropdown(label: '관리분류', items: AppState.comboMan, selectedItem: _selectedMan, onChanged: (v) => setState(() => _selectedMan = v)),
                         if (AppState.comboMan.isNotEmpty) const SizedBox(height: 10),
-                        if (AppState.comboJy.isNotEmpty && (AppState.loginUser?.certAreaType() ?? false))
+                        if (AppState.comboJy.isNotEmpty)
                           CommonWidgets.buildDropdown(label: '지역분류', items: AppState.comboJy, selectedItem: _selectedJy, onChanged: (v) => setState(() => _selectedJy = v)),
                         if (AppState.comboJy.isNotEmpty) const SizedBox(height: 10),
+                        if (AppState.comboSort.isNotEmpty)
+                          CommonWidgets.buildDropdown(label: '조회순서', items: AppState.comboSort, selectedItem: _selectedSort, onChanged: (v) => setState(() => _selectedSort = v), addAll: false),
+                        if (AppState.comboSort.isNotEmpty) const SizedBox(height: 10),
                       ],
                     ),
                   ),
@@ -182,10 +197,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        if (AppState.comboSort.isNotEmpty)
-                          CommonWidgets.buildDropdown(label: '조회순서', items: AppState.comboSort, selectedItem: _selectedSort, onChanged: (v) => setState(() => _selectedSort = v), addAll: false),
-                        if (AppState.comboSort.isNotEmpty) const SizedBox(height: 10),
+                        Row(
+                          children: [
+                            const Expanded(
+                              child: Text('하단 네비게이션 바 숨기기', style: TextStyle(fontSize: 14, color: Colors.black87)),
+                            ),
+                            Switch(
+                              value: _hideBottomNavigation,
+                              onChanged: (v) => setState(() => _hideBottomNavigation = v),
+                            ),
+                          ],
+                        ),
+                        const Text(
+                          '하단 네비게이션 바를 숨겨 더 넓은 화면을 사용할 수 있습니다.',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
                       ],
                     ),
                   ),
@@ -219,6 +247,29 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       color: const Color(0xFF555555),
       child: Text(title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.white)),
+    );
+  }
+
+  Widget _buildReadOnlyField(String label, String value, {bool obscure = false}) {
+    final display = obscure && value.isNotEmpty ? '•' * value.length : value;
+    return Row(
+      children: [
+        SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+        Expanded(
+          child: SizedBox(
+            height: 36,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                border: Border.all(color: Colors.grey.shade400),
+                borderRadius: BorderRadius.circular(4),
+              ),
+              alignment: Alignment.centerLeft,
+              child: Text(display, style: const TextStyle(fontSize: 13, color: Colors.black87)),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

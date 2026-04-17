@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import '../models/auth_login.dart';
@@ -22,12 +23,16 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _idController = TextEditingController(text: 'test');
-  final _pwdController = TextEditingController(text: 'test');
+  final _idController = TextEditingController(text: 'test2');
+  final _pwdController = TextEditingController(text: 'test2');
+  final _phoneController = TextEditingController();
+  final _phonePwdController = TextEditingController();
   bool _saveLogin = false;
   bool _obscurePassword = false;
+  bool _obscurePhonePwd = false;
   bool _isLoading = false;
   bool _isDeepLinkLogin = false;
+  bool _isPhoneLogin = false; // false = ID/PWD 로그인, true = 전화번호 로그인
 
   @override
   void initState() {
@@ -39,8 +44,23 @@ class _LoginScreenState extends State<LoginScreen> {
   void _performAutoLogin() {
     _saveLogin = PrefsUtil.getBool(Keys.prefSavedLogin);
 
+    // 저장된 전화번호 로그인 모드 확인
+    final savedPhoneLogin = PrefsUtil.getBool('PREF_PHONE_LOGIN');
+    if (savedPhoneLogin) {
+      _isPhoneLogin = true;
+      final savedPhone = PrefsUtil.getString('PREF_PHONE_NUMBER') ?? '';
+      final savedPhonePwd = PrefsUtil.getString('PREF_PHONE_PWD') ?? '';
+      final savedImei = PrefsUtil.getString('PREF_PHONE_IMEI') ?? '';
+      if (_saveLogin && savedPhone.isNotEmpty && savedPhonePwd.isNotEmpty) {
+        _phoneController.text = savedPhone;
+        _phonePwdController.text = savedPhonePwd;
+        _doPhoneLogin(selectedImei: savedImei.isNotEmpty ? savedImei : null);
+        return;
+      }
+    }
+
     // 우선순위 1: 저장된 로그인 정보
-    if (_saveLogin) {
+    if (_saveLogin && !savedPhoneLogin) {
       final savedId = PrefsUtil.getString(Keys.prefUserId) ?? '';
       final savedPwd = PrefsUtil.getString(Keys.prefUserPwd) ?? '';
       if (savedId.isNotEmpty && savedPwd.isNotEmpty) {
@@ -59,8 +79,6 @@ class _LoginScreenState extends State<LoginScreen> {
       _doLogin();
       return;
     }
-
-    // 우선순위 3: 일반 로그인 화면 표시
   }
 
   Future<void> _doLogin() async {
@@ -118,6 +136,7 @@ class _LoginScreenState extends State<LoginScreen> {
         if (!_isDeepLinkLogin && _saveLogin) {
           PrefsUtil.setString(Keys.prefUserId, id);
           PrefsUtil.setString(Keys.prefUserPwd, pwd);
+          PrefsUtil.setBool('PREF_PHONE_LOGIN', false);
         }
         PrefsUtil.setBool(Keys.prefSavedLogin, _isDeepLinkLogin ? false : _saveLogin);
 
@@ -133,6 +152,115 @@ class _LoginScreenState extends State<LoginScreen> {
       final msg = resp['result'] ?? '로그인에 실패했습니다.';
       Fluttertoast.showToast(msg: msg);
     }
+  }
+
+  /// 전화번호 로그인
+  Future<void> _doPhoneLogin({String? selectedImei}) async {
+    final phone = _phoneController.text.trim().replaceAll('-', '');
+    final pwd = _phonePwdController.text.trim();
+    if (phone.isEmpty || pwd.isEmpty) {
+      Fluttertoast.showToast(msg: '전화번호와 비밀번호를 입력하세요.');
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    final req = <String, dynamic>{
+      'phoneNumber': phone,
+      'loginPwd': pwd,
+      'appVersion': '3.0.1010',
+    };
+    if (selectedImei != null) {
+      req['selectedImei'] = selectedImei;
+    }
+
+    if (!mounted) return;
+    final resp = await NetHelper.request(context, () => NetHelper.api.authLoginByPhone(req), showProgress: false);
+    if (!mounted) return;
+
+    setState(() => _isLoading = false);
+
+    // 복수 사용자 → 선택 다이얼로그
+    if (resp['result'] == 'MULTI_USER' && resp['resultCode'] == 200) {
+      final userList = resp['resultData'] as List;
+      _showUserSelectDialog(userList);
+      return;
+    }
+
+    if (NetHelper.isSuccess(resp)) {
+      final resultData = resp['resultData'];
+      if (resultData != null) {
+        final authLogin = AuthLogin.fromJson(resultData);
+        AppState.setLoginUser(authLogin);
+
+        // 캐시 초기화
+        PrefsUtil.clearKeysStartWith('CACHE_SEARCH_CONDITION_');
+        PrefsUtil.clearKeysStartWith('CACHE_SAFETY_CONDITION_');
+        PrefsUtil.clearKeysStartWith('CACHE_METERING_STATUS_CONDITION_');
+        PrefsUtil.clearKeysStartWith('CACHE_SAFETY_STATUS_CONDITION_');
+
+        if (_saveLogin) {
+          PrefsUtil.setString('PREF_PHONE_NUMBER', phone);
+          PrefsUtil.setString('PREF_PHONE_PWD', pwd);
+          PrefsUtil.setBool('PREF_PHONE_LOGIN', true);
+          if (selectedImei != null) {
+            PrefsUtil.setString('PREF_PHONE_IMEI', selectedImei);
+          }
+        }
+        PrefsUtil.setBool(Keys.prefSavedLogin, _saveLogin);
+
+        await _updateSafeSW(authLogin.baAreaCode?.trim() ?? '');
+      }
+    } else {
+      final msg = resp['result'] ?? '등록되지 않은 전화번호입니다.';
+      Fluttertoast.showToast(msg: msg);
+    }
+  }
+
+  /// 복수 사용자 선택 다이얼로그
+  void _showUserSelectDialog(List userList) {
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (ctx) => AlertDialog(
+        title: const Text('사용자 선택', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: userList.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (_, i) {
+              final user = userList[i];
+              final name = user['Login_Name'] ?? '';
+              final id = user['Login_User'] ?? '';
+              final company = user['Login_Co'] ?? '';
+              final model = user['HP_Model'] ?? '';
+              final imei = user['HP_IMEI'] ?? '';
+              return ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                leading: CircleAvatar(
+                  backgroundColor: const Color(0xFF1976D2),
+                  child: Text('${i + 1}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                ),
+                title: Text('$name ($id)', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                subtitle: Text('$company / $model', style: const TextStyle(fontSize: 13, color: Colors.black54)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _doPhoneLogin(selectedImei: imei);
+                },
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+        ],
+      ),
+    );
   }
 
   /// Android의 updateSafeSW와 동일 - 안전관리자 이름을 조회하여 설정
@@ -204,40 +332,16 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 // 타이틀
-                const Text('가스안전관리', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
+                const Text('가스 안전관리 2026', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
                 const SizedBox(height: 25),
                 // 로고
                 Image.asset('assets/images/login_logo.png', width: 200, height: 140, fit: BoxFit.contain),
-                const SizedBox(height: 32),
-                // 아이디
-                TextField(
-                  controller: _idController,
-                  decoration: InputDecoration(
-                    labelText: '아이디',
-                    hintText: '아이디를 입력하세요',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    prefixIcon: const Icon(Icons.person),
-                  ),
-                  style: const TextStyle(fontSize: 18),
-                ),
-                const SizedBox(height: 12),
-                // 비밀번호
-                TextField(
-                  controller: _pwdController,
-                  obscureText: _obscurePassword,
-                  decoration: InputDecoration(
-                    labelText: '비밀번호',
-                    hintText: '비밀번호를 입력하세요',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                    prefixIcon: const Icon(Icons.lock),
-                    suffixIcon: IconButton(
-                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                    ),
-                  ),
-                  style: const TextStyle(fontSize: 18),
-                  onSubmitted: (_) => _doLogin(),
-                ),
+                const SizedBox(height: 24),
+                // 로그인 모드 전환 탭
+                _buildLoginModeToggle(),
+                const SizedBox(height: 20),
+                // 로그인 폼
+                _isPhoneLogin ? _buildPhoneLoginForm() : _buildIdPwdLoginForm(),
                 const SizedBox(height: 8),
                 // 로그인 정보 저장
                 Row(
@@ -257,33 +361,38 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: SizedBox(
                         height: 48,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _doLogin,
+                          onPressed: _isLoading ? null : (_isPhoneLogin ? _doPhoneLogin : _doLogin),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF555555),
+                            backgroundColor: _isPhoneLogin ? const Color(0xFF1976D2) : const Color(0xFF555555),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                           child: _isLoading
                               ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                              : const Text('로그인', style: TextStyle(fontSize: 18, color: Colors.white)),
+                              : Text(
+                                  _isPhoneLogin ? '전화번호 로그인' : '로그인',
+                                  style: const TextStyle(fontSize: 18, color: Colors.white),
+                                ),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: SizedBox(
-                        height: 48,
-                        child: ElevatedButton(
-                          onPressed: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen()));
-                          },
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF555555),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    if (!_isPhoneLogin) ...[
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: SizedBox(
+                          height: 48,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen()));
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF555555),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            ),
+                            child: const Text('가입신청', style: TextStyle(fontSize: 18, color: Colors.white)),
                           ),
-                          child: const Text('가입신청', style: TextStyle(fontSize: 18, color: Colors.white)),
                         ),
                       ),
-                    ),
+                    ],
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -304,10 +413,140 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// 로그인 모드 전환 토글 (ID/PWD <-> 전화번호)
+  Widget _buildLoginModeToggle() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF0F0F0),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _isPhoneLogin = false),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: !_isPhoneLogin ? const Color(0xFF555555) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'UUID / ID / 비밀번호',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: !_isPhoneLogin ? Colors.white : const Color(0xFF888888),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _isPhoneLogin = true),
+              child: Container(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: _isPhoneLogin ? const Color(0xFF1976D2) : Colors.transparent,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '전화번호',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: _isPhoneLogin ? Colors.white : const Color(0xFF888888),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// ID/PWD 로그인 폼
+  Widget _buildIdPwdLoginForm() {
+    return Column(
+      children: [
+        TextField(
+          controller: _idController,
+          decoration: InputDecoration(
+            labelText: '아이디',
+            hintText: '아이디를 입력하세요',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            prefixIcon: const Icon(Icons.person),
+          ),
+          style: const TextStyle(fontSize: 18),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _pwdController,
+          obscureText: _obscurePassword,
+          decoration: InputDecoration(
+            labelText: '비밀번호',
+            hintText: '비밀번호를 입력하세요',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            prefixIcon: const Icon(Icons.lock),
+            suffixIcon: IconButton(
+              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+            ),
+          ),
+          style: const TextStyle(fontSize: 18),
+          onSubmitted: (_) => _doLogin(),
+        ),
+      ],
+    );
+  }
+
+  /// 전화번호 로그인 폼
+  Widget _buildPhoneLoginForm() {
+    return Column(
+      children: [
+        TextField(
+          controller: _phoneController,
+          keyboardType: TextInputType.phone,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            labelText: '전화번호',
+            hintText: '전화번호를 입력하세요 (- 없이)',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            prefixIcon: const Icon(Icons.phone),
+          ),
+          style: const TextStyle(fontSize: 18),
+        ),
+        const SizedBox(height: 12),
+        TextField(
+          controller: _phonePwdController,
+          obscureText: _obscurePhonePwd,
+          decoration: InputDecoration(
+            labelText: '비밀번호',
+            hintText: '비밀번호를 입력하세요',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+            prefixIcon: const Icon(Icons.lock),
+            suffixIcon: IconButton(
+              icon: Icon(_obscurePhonePwd ? Icons.visibility_off : Icons.visibility),
+              onPressed: () => setState(() => _obscurePhonePwd = !_obscurePhonePwd),
+            ),
+          ),
+          style: const TextStyle(fontSize: 18),
+          onSubmitted: (_) => _doPhoneLogin(),
+        ),
+      ],
+    );
+  }
+
   @override
   void dispose() {
     _idController.dispose();
     _pwdController.dispose();
+    _phoneController.dispose();
+    _phonePwdController.dispose();
     super.dispose();
   }
 }

@@ -452,7 +452,7 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
           const SizedBox(width: 100, child: Text('점검사원', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
           Expanded(
             child: Container(
-              height: 36,
+              height: AppInput.height,
               padding: const EdgeInsets.symmetric(horizontal: 8),
               decoration: BoxDecoration(
                 border: Border.all(color: Colors.grey.shade400),
@@ -484,38 +484,9 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
       child: Row(
         children: [
           const SizedBox(width: 100, child: Text('저장량', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-          SizedBox(
-            width: 80,
-            height: 36,
-            child: TextField(
-              controller: _tankKg01Controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                isDense: true,
-              ),
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 4),
-            child: Text('kg', style: TextStyle(fontSize: 13)),
-          ),
-          SizedBox(
-            width: 80,
-            height: 36,
-            child: TextField(
-              controller: _tankKg02Controller,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                isDense: true,
-              ),
-              style: const TextStyle(fontSize: 13),
-            ),
-          ),
+          SizedBox(width: 80, child: AppInput(controller: _tankKg01Controller, keyboardType: const TextInputType.numberWithOptions(decimal: true))),
+          const Padding(padding: EdgeInsets.symmetric(horizontal: 4), child: Text('kg', style: TextStyle(fontSize: 13))),
+          SizedBox(width: 80, child: AppInput(controller: _tankKg02Controller, keyboardType: const TextInputType.numberWithOptions(decimal: true))),
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 4),
             child: Text('kg', style: TextStyle(fontSize: 13)),
@@ -605,7 +576,7 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
                       Text(labelPrefix, style: const TextStyle(fontSize: 12)),
                       Expanded(
                         child: SizedBox(
-                          height: 34,
+                          height: AppInput.height,
                           child: TextField(
                             controller: labelController,
                             decoration: InputDecoration(
@@ -625,7 +596,7 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
           // Result dropdown
           SizedBox(
             width: 80,
-            height: 34,
+            height: AppInput.height,
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
@@ -657,7 +628,7 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
           Expanded(
             flex: 3,
             child: SizedBox(
-              height: 34,
+              height: AppInput.height,
               child: TextField(
                 controller: _bigoControllers[bigoKey],
                 decoration: InputDecoration(
@@ -800,12 +771,7 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
   Widget _textField(String label, TextEditingController ctrl, {bool readOnly = false, VoidCallback? onTap, TextInputType keyboardType = TextInputType.text}) {
     return Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [
       SizedBox(width: 100, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
-      Expanded(child: SizedBox(height: 36, child: TextField(
-        controller: ctrl, readOnly: readOnly, onTap: onTap, keyboardType: keyboardType,
-        decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 8), isDense: true),
-        style: const TextStyle(fontSize: 13),
-      ))),
+      Expanded(child: AppInput(controller: ctrl, readOnly: readOnly, onTap: onTap, keyboardType: keyboardType)),
     ]));
   }
 

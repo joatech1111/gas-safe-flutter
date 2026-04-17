@@ -7,6 +7,7 @@ import '../network/net_helper.dart';
 import '../utils/app_state.dart';
 import '../utils/date_util.dart';
 import '../widgets/common_widgets.dart';
+import '../widgets/customer_edit_dialog.dart';
 import 'safety_check_screen.dart';
 
 class SafetyScreen extends StatefulWidget {
@@ -18,6 +19,8 @@ class SafetyScreen extends StatefulWidget {
 
 class _SafetyScreenState extends State<SafetyScreen> {
   final _searchController = TextEditingController();
+  final _buildingNameController = TextEditingController();
+  final _includeAddressController = TextEditingController();
   List<SafetyCustomerResultData> _resultList = [];
   bool _isSearchExpanded = true;
 
@@ -34,6 +37,8 @@ class _SafetyScreenState extends State<SafetyScreen> {
   int _cuType = 0; // 0=전체, 1=중량, 2=체적
   int _safeFlan = 0; // 0=전체, 1=특정일자
   String _safeFlanDate = DateUtil.today();
+  bool _showConformityOnly = false;
+  bool _showSuppOnly = false;
 
   @override
   void initState() {
@@ -55,8 +60,19 @@ class _SafetyScreenState extends State<SafetyScreen> {
         _swList = AppState.comboSw;
         _manList = AppState.comboMan;
         _jyList = AppState.comboJy;
+        _selectedSw = _findComboByCode(_swList, AppState.swCode);
+        _selectedMan = _findComboByCode(_manList, AppState.gubunCode);
+        _selectedJy = _findComboByCode(_jyList, AppState.jyCode);
       });
     }
+  }
+
+  ComboData? _findComboByCode(List<ComboData> items, String code) {
+    if (code.trim().isEmpty) return null;
+    for (final item in items) {
+      if ((item.cd ?? '').trim() == code.trim()) return item;
+    }
+    return null;
   }
 
   Map<String, dynamic> _buildReq() {
@@ -68,7 +84,9 @@ class _SafetyScreenState extends State<SafetyScreen> {
 
     return {
       'AREA_CODE': AppState.areaCode,
-      'FIND_STR': _searchController.text.trim(),
+      'FIND_STR': _searchController.text.trim().isNotEmpty
+          ? _searchController.text.trim()
+          : _buildingNameController.text.trim(),
       'SAFE_FLAN': safeFlan,
       'CU_TYPE': _cuType.toString(),
       'CU_CODE': '',
@@ -76,9 +94,9 @@ class _SafetyScreenState extends State<SafetyScreen> {
       'SW_CD': _selectedSw?.cd ?? '',
       'MAN_CD': _selectedMan?.cd ?? '',
       'JY_CD': _selectedJy?.cd ?? '',
-      'ADDR_TEXT': '',
-      'SUPP_YN': 'N',
-      'Conformity_YN': 'N',
+      'ADDR_TEXT': _includeAddressController.text.trim(),
+      'SUPP_YN': _showSuppOnly ? 'Y' : 'N',
+      'Conformity_YN': _showConformityOnly ? 'Y' : 'N',
       'OrderBy': '',
     };
   }
@@ -131,6 +149,10 @@ class _SafetyScreenState extends State<SafetyScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: CommonWidgets.buildAppBar(context, '안전점검'),
+      bottomNavigationBar: CommonWidgets.buildBottomStatusBar(
+        workerName: AppState.safeSwName,
+        rightText: '조회: ${_resultList.length}건',
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -186,34 +208,108 @@ class _SafetyScreenState extends State<SafetyScreen> {
                       const SizedBox(width: 80, child: Text('예정기간', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
                       _buildRadio2('전체', 0),
                       _buildRadio2('특정일자', 1),
+                      const SizedBox(width: 8),
+                      Expanded(child: _buildScheduledDateField()),
                     ],
                   ),
-                  if (_safeFlan == 1) ...[
-                    const SizedBox(height: 6),
-                    CommonWidgets.buildDateField(context: context, label: '점검예정일', value: _safeFlanDate, onChanged: (v) => setState(() => _safeFlanDate = v)),
-                  ],
                   const SizedBox(height: 6),
                   // 거래구분
                   Row(
                     children: [
                       const SizedBox(width: 80, child: Text('거래구분', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
                       _buildCuTypeRadio('전체', 0),
-                      _buildCuTypeRadio('중량', 1),
-                      _buildCuTypeRadio('체적', 2),
+                      _buildCuTypeRadio('중량(6개월)', 1),
+                      _buildCuTypeRadio('체적(1년)', 2),
                     ],
                   ),
                   const SizedBox(height: 6),
                   if (_aptList.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '건물명', items: _aptList, selectedItem: _selectedApt, onChanged: (v) => setState(() => _selectedApt = v)),
+                    Row(
+                      children: [
+                        const SizedBox(width: 80, child: Text('건물명', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                        Expanded(
+                          flex: 3,
+                          child: AppInput(
+                            controller: _buildingNameController,
+                            hint: '건물명',
+                            onChanged: (_) => setState(() {}),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: _buildInlineDropdown(
+                            items: _filteredAptList,
+                            selectedItem: _selectedApt,
+                            onChanged: (v) => setState(() => _selectedApt = v),
+                          ),
+                        ),
+                      ],
+                    ),
                   if (_aptList.isNotEmpty) const SizedBox(height: 6),
-                  if (_swList.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '담당사원', items: _swList, selectedItem: _selectedSw, onChanged: (v) => setState(() => _selectedSw = v)),
-                  if (_swList.isNotEmpty) const SizedBox(height: 6),
-                  if (_manList.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '관리분류', items: _manList, selectedItem: _selectedMan, onChanged: (v) => setState(() => _selectedMan = v)),
-                  if (_manList.isNotEmpty) const SizedBox(height: 6),
-                  if (_jyList.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '지역분류', items: _jyList, selectedItem: _selectedJy, onChanged: (v) => setState(() => _selectedJy = v)),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildLabeledDropdownField(
+                          label: '담당사원',
+                          items: _swList,
+                          selectedItem: _selectedSw,
+                          onChanged: (v) => setState(() => _selectedSw = v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: _buildLabeledDropdownField(
+                          label: '관리분류',
+                          items: _manList,
+                          selectedItem: _selectedMan,
+                          onChanged: (v) => setState(() => _selectedMan = v),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _buildLabeledDropdownField(
+                          label: '지점분류',
+                          items: _jyList,
+                          selectedItem: _selectedJy,
+                          onChanged: (v) => setState(() => _selectedJy = v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const SizedBox(width: 60, child: Text('포함주소', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                      const SizedBox(width: 6),
+                      Expanded(child: AppInput(controller: _includeAddressController, hint: '포함주소')),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('부적합 거래처', style: TextStyle(fontSize: 13)),
+                          value: _showConformityOnly,
+                          onChanged: (v) => setState(() => _showConformityOnly = v ?? false),
+                        ),
+                      ),
+                      Expanded(
+                        child: CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('공급계약 거래처만 조회', style: TextStyle(fontSize: 13)),
+                          value: _showSuppOnly,
+                          onChanged: (v) => setState(() => _showSuppOnly = v ?? false),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   CommonWidgets.buildSearchField(controller: _searchController, onSearch: _searchByKeyword, onGpsSearch: _searchByLocation),
                   const SizedBox(height: 8),
@@ -234,6 +330,124 @@ class _SafetyScreenState extends State<SafetyScreen> {
         Text(label, style: const TextStyle(fontSize: 12)),
       ],
     );
+  }
+
+  List<ComboData> get _filteredAptList {
+    final keyword = _buildingNameController.text.trim().toLowerCase();
+    if (keyword.isEmpty) return _aptList;
+    final filtered = _aptList.where((e) => e.getCdName().toLowerCase().contains(keyword)).toList();
+    return filtered.isEmpty ? _aptList : filtered;
+  }
+
+  Widget _buildScheduledDateField() {
+    final enabled = _safeFlan == 1;
+    return GestureDetector(
+      onTap: enabled ? _pickSafeFlanDate : null,
+      child: Container(
+        height: AppInput.height,
+        padding: const EdgeInsets.symmetric(horizontal: 10),
+        decoration: BoxDecoration(
+          color: enabled ? Colors.white : Colors.grey.shade100,
+          border: Border.all(color: Colors.grey.shade400),
+          borderRadius: BorderRadius.circular(AppInput.borderRadius),
+        ),
+        alignment: Alignment.centerLeft,
+        child: Text(
+          DateUtil.toDisplay(_safeFlanDate),
+          style: TextStyle(fontSize: AppInput.fontSize, color: enabled ? Colors.black87 : Colors.black45),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _pickSafeFlanDate() async {
+    final initialDate = _parseYyyyMmDd(_safeFlanDate) ?? DateTime.now();
+    final date = await CommonWidgets.showKoreanDatePicker(
+      context: context,
+      initialDate: initialDate,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
+    );
+    if (date == null || !mounted) return;
+    setState(() {
+      _safeFlanDate = '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
+    });
+  }
+
+  DateTime? _parseYyyyMmDd(String value) {
+    if (value.length != 8) return null;
+    try {
+      return DateTime(
+        int.parse(value.substring(0, 4)),
+        int.parse(value.substring(4, 6)),
+        int.parse(value.substring(6, 8)),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Widget _buildLabeledDropdownField({
+    required String label,
+    required List<ComboData> items,
+    required ComboData? selectedItem,
+    required ValueChanged<ComboData?> onChanged,
+  }) {
+    return Row(
+      children: [
+        SizedBox(width: 60, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+        const SizedBox(width: 6),
+        Expanded(
+          child: _buildInlineDropdown(
+            items: items,
+            selectedItem: selectedItem,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildInlineDropdown({
+    required List<ComboData> items,
+    required ComboData? selectedItem,
+    required ValueChanged<ComboData?> onChanged,
+  }) {
+    final allItems = <ComboData>[ComboData(cdName: '전체'), ...items];
+    final selected = _findMatchingItem(allItems, selectedItem);
+    return Container(
+      height: AppInput.height,
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(AppInput.borderRadius),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<ComboData>(
+          isExpanded: true,
+          isDense: true,
+          value: selected,
+          items: allItems
+              .map(
+                (e) => DropdownMenuItem<ComboData>(
+                  value: e,
+                  child: Text(e.getCdName(), style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                ),
+              )
+              .toList(),
+          onChanged: onChanged,
+        ),
+      ),
+    );
+  }
+
+  ComboData? _findMatchingItem(List<ComboData> items, ComboData? selected) {
+    if (items.isEmpty) return null;
+    if (selected == null) return items.first;
+    for (final item in items) {
+      if (item == selected) return item;
+    }
+    return items.first;
   }
 
   Widget _buildCuTypeRadio(String label, int value) {
@@ -380,6 +594,16 @@ class _SafetyScreenState extends State<SafetyScreen> {
                 ),
               ),
               ListTile(
+                leading: const Icon(Icons.store, color: Color(0xFF666666)),
+                title: const Text('거래처 정보'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final edited = await CustomerEditDialog.show(context, item);
+                  if (!mounted || edited == null) return;
+                  setState(() {});
+                },
+              ),
+              ListTile(
                 leading: const Icon(Icons.history, color: Color(0xFF666666)),
                 title: const Text('점검 이력'),
                 onTap: () { Navigator.pop(ctx); _goToSafetyCheck(item, 0); },
@@ -421,6 +645,8 @@ class _SafetyScreenState extends State<SafetyScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _buildingNameController.dispose();
+    _includeAddressController.dispose();
     super.dispose();
   }
 }

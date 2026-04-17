@@ -37,7 +37,7 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> with SingleTicker
         foregroundColor: Colors.black87,
         elevation: 0.5,
         leading: IconButton(
-          icon: const Icon(Icons.home, color: Colors.black87),
+          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 22),
           onPressed: () => Navigator.pop(context),
         ),
         actions: [

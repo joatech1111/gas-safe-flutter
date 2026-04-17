@@ -17,6 +17,7 @@ class SafetyStatusScreen extends StatefulWidget {
 
 class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
   final _searchController = TextEditingController();
+  final _includeAddressController = TextEditingController();
   List<SafetyStatusResultData> _resultList = [];
   bool _isSearchExpanded = true;
 
@@ -28,8 +29,47 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
   int _cuType = 0;
   String _dateFrom = DateUtil.beforeDays(7);
   String _dateTo = DateUtil.today();
+  bool _showConformityOnly = false;
+  bool _showSuppOnly = false;
 
-  Map<String, dynamic> _buildReq() => {
+  @override
+  void initState() {
+    super.initState();
+    _loadSearchConditions();
+  }
+
+  Future<void> _loadSearchConditions() async {
+    final resp = await NetHelper.request(
+      context,
+      () => NetHelper.api.safetyCustomerSearchCondition(AppState.areaCode),
+    );
+    if (!mounted) return;
+    if (NetHelper.isSuccess(resp) && resp['resultData'] != null) {
+      AppState.parseSafetyCondition(resp['resultData']);
+      setState(() {
+        _selectedSw = _findComboByCode(AppState.comboSw, AppState.swCode);
+        _selectedMan = _findComboByCode(AppState.comboMan, AppState.gubunCode);
+        _selectedJy = _findComboByCode(AppState.comboJy, AppState.jyCode);
+      });
+    }
+  }
+
+  ComboData? _findComboByCode(List<ComboData> items, String code) {
+    if (code.trim().isEmpty) return null;
+    for (final item in items) {
+      if ((item.cd ?? '').trim() == code.trim()) return item;
+    }
+    return null;
+  }
+
+  String _buildAppUser() {
+    final hpSno = (AppState.loginUser?.hpSno ?? '').trim();
+    final loginName = (AppState.loginUser?.loginName ?? '').trim();
+    final combined = '$hpSno$loginName';
+    return combined.isNotEmpty ? combined : AppState.loginUserId;
+  }
+
+  Map<String, dynamic> _buildReqKeyword() => {
     'AREA_CODE': AppState.areaCode,
     'FIND_STR': _searchController.text.trim(),
     'GUM_DATE_F': _dateFrom,
@@ -40,16 +80,35 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
     'SW_CD': _selectedSw?.cd ?? '',
     'MAN_CD': _selectedMan?.cd ?? '',
     'JY_CD': _selectedJy?.cd ?? '',
-    'ADDR_TEXT': '',
-    'SUPP_YN': '',
-    'Conformity_YN': '',
+    'ADDR_TEXT': _includeAddressController.text.trim(),
+    'SUPP_YN': _showSuppOnly ? 'Y' : 'N',
+    'Conformity_YN': _showConformityOnly ? 'N' : 'Y',
     'OrderBy': '',
-    'SAFE_CD': '',
-    'APP_User': AppState.loginUserId,
+    'SAFE_CD': AppState.safeSwCode,
+    'APP_User': _buildAppUser(),
+  };
+
+  Map<String, dynamic> _buildReqLocation() => {
+    'AREA_CODE': AppState.areaCode,
+    'FIND_STR': '',
+    'GUM_DATE_F': _dateFrom,
+    'GUM_DATE_T': _dateTo,
+    'CU_TYPE': _cuType.toString(),
+    'CU_CODE': '',
+    'APT_CD': _selectedApt?.cd ?? '',
+    'SW_CD': _selectedSw?.cd ?? '',
+    'MAN_CD': _selectedMan?.cd ?? '',
+    'JY_CD': _selectedJy?.cd ?? '',
+    'ADDR_TEXT': _includeAddressController.text.trim(),
+    'SUPP_YN': _showSuppOnly ? 'Y' : 'N',
+    'Conformity_YN': _showConformityOnly ? 'N' : 'Y',
+    'OrderBy': '',
+    'SAFE_CD': AppState.safeSwCode,
+    'APP_User': _buildAppUser(),
   };
 
   Future<void> _searchByKeyword() async {
-    final resp = await NetHelper.request(context, () => NetHelper.api.safetyStatusSearchKeyword(_buildReq()));
+    final resp = await NetHelper.request(context, () => NetHelper.api.safetyStatusSearchKeyword(_buildReqKeyword()));
     if (!mounted) return;
     if (NetHelper.isSuccess(resp)) {
       final list = resp['resultData'];
@@ -70,7 +129,7 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
         await Geolocator.requestPermission();
       }
       final pos = await Geolocator.getCurrentPosition();
-      final req = _buildReq();
+      final req = _buildReqLocation();
       req['GPS_X'] = pos.longitude.toString();
       req['GPS_Y'] = pos.latitude.toString();
 
@@ -95,7 +154,11 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: CommonWidgets.buildAppBar(context, '점검현황'),
+      appBar: CommonWidgets.buildAppBar(context, '점검 현황'),
+      bottomNavigationBar: CommonWidgets.buildBottomStatusBar(
+        workerName: AppState.safeSwName,
+        rightText: '조회: ${_resultList.length}건',
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -152,16 +215,21 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                       Expanded(
                         child: GestureDetector(
                           onTap: () async {
-                            final date = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2100));
+                            final date = await CommonWidgets.showKoreanDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
                             if (date != null) {
                               setState(() => _dateFrom = '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}');
                             }
                           },
                           child: Container(
-                            height: 36, padding: const EdgeInsets.symmetric(horizontal: 8),
-                            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
+                            height: AppInput.height, padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(AppInput.borderRadius)),
                             alignment: Alignment.center,
-                            child: Text(DateUtil.toDisplay(_dateFrom), style: const TextStyle(fontSize: 13)),
+                            child: Text(DateUtil.toDisplay(_dateFrom), style: const TextStyle(fontSize: AppInput.fontSize)),
                           ),
                         ),
                       ),
@@ -169,7 +237,12 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                       Expanded(
                         child: GestureDetector(
                           onTap: () async {
-                            final date = await showDatePicker(context: context, initialDate: DateTime.now(), firstDate: DateTime(2000), lastDate: DateTime(2100));
+                            final date = await CommonWidgets.showKoreanDatePicker(
+                              context: context,
+                              initialDate: DateTime.now(),
+                              firstDate: DateTime(2000),
+                              lastDate: DateTime(2100),
+                            );
                             if (date != null) {
                               final v = '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
                               if (v.compareTo(_dateFrom) < 0) {
@@ -180,10 +253,10 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                             }
                           },
                           child: Container(
-                            height: 36, padding: const EdgeInsets.symmetric(horizontal: 8),
-                            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
+                            height: AppInput.height, padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(AppInput.borderRadius)),
                             alignment: Alignment.center,
-                            child: Text(DateUtil.toDisplay(_dateTo), style: const TextStyle(fontSize: 13)),
+                            child: Text(DateUtil.toDisplay(_dateTo), style: const TextStyle(fontSize: AppInput.fontSize)),
                           ),
                         ),
                       ),
@@ -194,22 +267,75 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                     children: [
                       const SizedBox(width: 80, child: Text('거래구분', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
                       _buildCuTypeRadio('전체', 0),
-                      _buildCuTypeRadio('중량', 1),
-                      _buildCuTypeRadio('체적', 2),
+                      _buildCuTypeRadio('중량(6개월)', 1),
+                      _buildCuTypeRadio('체적(1년)', 2),
                     ],
                   ),
                   const SizedBox(height: 6),
-                  if (AppState.comboApt.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '건물명', items: AppState.comboApt, selectedItem: _selectedApt, onChanged: (v) => setState(() => _selectedApt = v)),
-                  if (AppState.comboApt.isNotEmpty) const SizedBox(height: 6),
-                  if (AppState.comboSw.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '담당사원', items: AppState.comboSw, selectedItem: _selectedSw, onChanged: (v) => setState(() => _selectedSw = v)),
-                  if (AppState.comboSw.isNotEmpty) const SizedBox(height: 6),
-                  if (AppState.comboMan.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '관리분류', items: AppState.comboMan, selectedItem: _selectedMan, onChanged: (v) => setState(() => _selectedMan = v)),
-                  if (AppState.comboMan.isNotEmpty) const SizedBox(height: 6),
-                  if (AppState.comboJy.isNotEmpty)
-                    CommonWidgets.buildDropdown(label: '지역분류', items: AppState.comboJy, selectedItem: _selectedJy, onChanged: (v) => setState(() => _selectedJy = v)),
+                  CommonWidgets.buildDropdown(
+                    label: '건물명',
+                    items: AppState.comboApt,
+                    selectedItem: _selectedApt,
+                    onChanged: (v) => setState(() => _selectedApt = v),
+                  ),
+                  const SizedBox(height: 6),
+                  CommonWidgets.buildDropdown(
+                    label: '담당사원',
+                    items: AppState.comboSw,
+                    selectedItem: _selectedSw,
+                    onChanged: (v) => setState(() => _selectedSw = v),
+                  ),
+                  const SizedBox(height: 6),
+                  CommonWidgets.buildDropdown(
+                    label: '관리분류',
+                    items: AppState.comboMan,
+                    selectedItem: _selectedMan,
+                    onChanged: (v) => setState(() => _selectedMan = v),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CommonWidgets.buildDropdown(
+                          label: '지역분류',
+                          items: AppState.comboJy,
+                          selectedItem: _selectedJy,
+                          onChanged: (v) => setState(() => _selectedJy = v),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 80,
+                        child: Text('포함주소', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                      ),
+                      Expanded(child: AppInput(controller: _includeAddressController, hint: '포함주소')),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('부적합 거래처', style: TextStyle(fontSize: 13)),
+                          value: _showConformityOnly,
+                          onChanged: (v) => setState(() => _showConformityOnly = v ?? false),
+                        ),
+                      ),
+                      Expanded(
+                        child: CheckboxListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text('공급계약 거래처만 조회', style: TextStyle(fontSize: 13)),
+                          value: _showSuppOnly,
+                          onChanged: (v) => setState(() => _showSuppOnly = v ?? false),
+                        ),
+                      ),
+                    ],
+                  ),
                   const SizedBox(height: 8),
                   CommonWidgets.buildSearchField(controller: _searchController, onSearch: _searchByKeyword, onGpsSearch: _searchByLocation),
                   const SizedBox(height: 8),
@@ -266,7 +392,7 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                     _tableDataCell(item.cuTypeName ?? '', flex: 2),
                     _tableDataCell(item.safeName ?? '', flex: 2),
                     _tableDataCell(item.anzCustName ?? '', flex: 3),
-                    _tableDataCell(DateUtil.toDisplay(item.anzDate ?? ''), flex: 2),
+                    _tableDataCell(DateUtil.convertFormat(item.anzDate ?? '', DateUtil.formatYyyymmdd, DateUtil.formatYyMmDd), flex: 2),
                     _tableDataCellColored(item.safeResultYN ?? '', flex: 1,
                         color: item.safeResultYN == 'Y' ? Colors.green : Colors.red),
                     _tableDataCell(item.anzSignYN ?? '', flex: 1),
@@ -322,6 +448,7 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
   @override
   void dispose() {
     _searchController.dispose();
+    _includeAddressController.dispose();
     super.dispose();
   }
 }

@@ -1,5 +1,6 @@
 package com.joatech.gasmax.webapi.services;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -44,6 +45,19 @@ public class AppUserSafeService implements IAppUserSafeService {
 
         return Optional.empty();
     }
+
+	@Override
+	public List<AppUserSafe> getAppUserSafeListByHpSNo(String hpSNo) {
+		try {
+			repo = new AppUserSafeRepository(config.getDbHostname(), config.getDbPortNumber(), config.getDbName(), config.getDbUsername(), config.getDbPassword());
+			List<AppUserSafe> list = repo.findAllByHpSNo(hpSNo);
+			repo.close();
+			return list;
+		} catch (Exception e) {
+			System.out.println(e.getMessage());
+		}
+		return new ArrayList<>();
+	}
 
 	@Override
 	public List<AppUserSafe> getAllAppUserSafe() {

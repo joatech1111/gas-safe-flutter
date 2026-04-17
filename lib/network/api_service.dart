@@ -85,6 +85,9 @@ class ApiService {
   Future<Map<String, dynamic>> authLogin(Map<String, dynamic> req) =>
       _request(() => _dio.post('auth/login', data: req));
 
+  Future<Map<String, dynamic>> authLoginByPhone(Map<String, dynamic> req) =>
+      _request(() => _dio.post('auth/loginByPhone', data: req));
+
   Future<Map<String, dynamic>> authLogout() =>
       _request(() => _dio.get('auth/logout'));
 

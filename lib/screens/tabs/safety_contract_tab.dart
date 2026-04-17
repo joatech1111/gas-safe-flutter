@@ -36,8 +36,6 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
 
   String? _signatureCustomer;
   String? _signatureSupplier;
-  final _custSignKey = GlobalKey<SignaturePadState>();
-  final _comSignKey = GlobalKey<SignaturePadState>();
 
   final _contractNoController = TextEditingController();
   final _anzDateController = TextEditingController();
@@ -216,18 +214,8 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
   }
 
   Future<void> _save({bool sendSMS = false}) async {
-    String custSign = '';
-    String comSign = '';
-    if (_custSignKey.currentState != null && !_custSignKey.currentState!.isEmpty) {
-      custSign = await _custSignKey.currentState!.toBase64() ?? '';
-    } else if (_signatureCustomer != null) {
-      custSign = _signatureCustomer!;
-    }
-    if (_comSignKey.currentState != null && !_comSignKey.currentState!.isEmpty) {
-      comSign = await _comSignKey.currentState!.toBase64() ?? '';
-    } else if (_signatureSupplier != null) {
-      comSign = _signatureSupplier!;
-    }
+    final custSign = _signatureCustomer ?? '';
+    final comSign = _signatureSupplier ?? '';
 
     Position? pos;
     try { pos = await Geolocator.getCurrentPosition(); } catch (_) {}
@@ -495,34 +483,16 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
   }
 
   Widget _miniInput(TextEditingController ctrl, {TextInputType type = TextInputType.text}) {
-    return Container(
-      height: 32,
-      decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
-      child: TextField(
-        controller: ctrl,
-        keyboardType: type,
-        decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8), isDense: true),
-        style: const TextStyle(fontSize: 13),
-      ),
-    );
+    return AppInput(controller: ctrl, keyboardType: type);
   }
 
   Widget _dateInput(TextEditingController ctrl) {
-    return GestureDetector(
-      onTap: () => _pickDate(ctrl),
-      child: Container(
-        height: 32,
-        padding: const EdgeInsets.symmetric(horizontal: 8),
-        decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
-        alignment: Alignment.centerLeft,
-        child: Text(ctrl.text.isEmpty ? '-' : ctrl.text, style: const TextStyle(fontSize: 13)),
-      ),
-    );
+    return AppInput(controller: ctrl, readOnly: true, onTap: () => _pickDate(ctrl));
   }
 
   Widget _miniDropdown({String? value, required List<DropdownMenuItem<String>> items, required ValueChanged<String?> onChanged}) {
     return Container(
-      height: 32, width: 100,
+      height: AppInput.height, width: 100,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
       child: DropdownButtonHideUnderline(
@@ -648,28 +618,11 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       child: Row(
         children: [
           SizedBox(width: 55, child: Text(label, style: const TextStyle(fontSize: 12))),
-          SizedBox(width: 60, child: Container(
-            height: 30,
-            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
-            child: TextField(
-              controller: qtyCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 6), isDense: true),
-              style: const TextStyle(fontSize: 12),
-            ),
-          )),
+          SizedBox(width: 60, child: AppInput(controller: qtyCtrl, keyboardType: TextInputType.number)),
           const SizedBox(width: 8),
           const Text('비고:', style: TextStyle(fontSize: 11, color: Colors.black54)),
           const SizedBox(width: 4),
-          Expanded(child: Container(
-            height: 30,
-            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
-            child: TextField(
-              controller: memoCtrl,
-              decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 6, vertical: 6), isDense: true),
-              style: const TextStyle(fontSize: 12),
-            ),
-          )),
+          Expanded(child: AppInput(controller: memoCtrl)),
         ],
       ),
     );
@@ -717,7 +670,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
               title: '공급자 서명', initial: _signatureSupplier,
               onSave: (d) => setState(() => _signatureSupplier = d),
             )),
-            if (hasSign) SignaturePad(key: _comSignKey, initialSignature: _signatureSupplier, canWrite: false),
+            if (hasSign) SignaturePad(key: ValueKey(_signatureSupplier), initialSignature: _signatureSupplier, canWrite: false),
           ],
         ),
       ),
@@ -745,7 +698,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
               title: '고객 서명', initial: _signatureCustomer,
               onSave: (d) => setState(() => _signatureCustomer = d),
             )),
-            if (hasSign) SignaturePad(key: _custSignKey, initialSignature: _signatureCustomer, canWrite: false),
+            if (hasSign) SignaturePad(key: ValueKey(_signatureCustomer), initialSignature: _signatureCustomer, canWrite: false),
           ],
         ),
       ),
@@ -803,15 +756,7 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       child: Row(
         children: [
           SizedBox(width: 85, child: Text(label, style: const TextStyle(fontSize: 12))),
-          Expanded(child: Container(
-            height: 32,
-            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(4)),
-            child: TextField(
-              controller: ctrl, keyboardType: type,
-              decoration: const InputDecoration(border: InputBorder.none, contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8), isDense: true),
-              style: const TextStyle(fontSize: 12),
-            ),
-          )),
+          Expanded(child: AppInput(controller: ctrl, keyboardType: type)),
         ],
       ),
     );

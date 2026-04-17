@@ -854,48 +854,29 @@ class _SafetySavingTabState extends State<SafetySavingTab> with AutomaticKeepAli
   }
 
   Widget _buildDateField() {
-    return SizedBox(
-      height: 40,
-      child: TextField(
-        controller: _anzDateController,
-        readOnly: true,
-        onTap: () => _pickDate(_anzDateController),
-        decoration: InputDecoration(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-          isDense: true,
-          suffixIcon: const Icon(Icons.calendar_today, size: 18),
-        ),
-        style: const TextStyle(fontSize: 14),
-      ),
+    return AppInput(
+      controller: _anzDateController,
+      readOnly: true,
+      onTap: () => _pickDate(_anzDateController),
+      suffixIcon: const Icon(Icons.calendar_today, size: 18),
     );
   }
 
   Widget _buildSwDropdown() {
     final swList = AppState.comboSw;
     if (swList.isEmpty) {
-      return SizedBox(
-        height: 40,
-        child: TextField(
-          readOnly: true,
-          decoration: InputDecoration(
-            hintText: AppState.safeSwName,
-            hintStyle: const TextStyle(fontSize: 14),
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-            isDense: true,
-          ),
-          style: const TextStyle(fontSize: 14),
-        ),
+      return AppInput(
+        controller: TextEditingController(text: AppState.safeSwName),
+        readOnly: true,
       );
     }
 
     return Container(
-      height: 40,
+      height: AppInput.height,
       padding: const EdgeInsets.symmetric(horizontal: 8),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade500),
-        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.grey.shade400),
+        borderRadius: BorderRadius.circular(AppInput.borderRadius),
       ),
       child: DropdownButtonHideUnderline(
         child: DropdownButton<ComboData>(
@@ -918,59 +899,15 @@ class _SafetySavingTabState extends State<SafetySavingTab> with AutomaticKeepAli
     return Row(
       children: [
         const SizedBox(width: 80, child: Text('LP가스(kg)', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500))),
-        Expanded(
-          child: SizedBox(
-            height: 40,
-            child: TextField(
-              controller: _lpKg01Controller,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                isDense: true,
-                suffixText: 'kg',
-                suffixStyle: const TextStyle(fontSize: 13, color: Colors.black54),
-              ),
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ),
+        Expanded(child: AppInput(controller: _lpKg01Controller, keyboardType: TextInputType.number, suffixText: 'kg')),
         const SizedBox(width: 8),
-        Expanded(
-          child: SizedBox(
-            height: 40,
-            child: TextField(
-              controller: _lpKg02Controller,
-              keyboardType: TextInputType.number,
-              decoration: InputDecoration(
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-                isDense: true,
-                suffixText: 'kg',
-                suffixStyle: const TextStyle(fontSize: 13, color: Colors.black54),
-              ),
-              style: const TextStyle(fontSize: 14),
-            ),
-          ),
-        ),
+        Expanded(child: AppInput(controller: _lpKg02Controller, keyboardType: TextInputType.number, suffixText: 'kg')),
       ],
     );
   }
 
   Widget _buildTextField(TextEditingController ctrl, {TextInputType keyboardType = TextInputType.text}) {
-    return SizedBox(
-      height: 40,
-      child: TextField(
-        controller: ctrl,
-        keyboardType: keyboardType,
-        decoration: InputDecoration(
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(4)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10),
-          isDense: true,
-        ),
-        style: const TextStyle(fontSize: 14),
-      ),
-    );
+    return AppInput(controller: ctrl, keyboardType: keyboardType);
   }
 
   Widget _buildSignatureRow() {

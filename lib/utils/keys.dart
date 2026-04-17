@@ -4,6 +4,7 @@ class Keys {
   static const String prefUserId = 'PREF_USER_ID';
   static const String prefUserPwd = 'PREF_USER_PWD';
   static const String prefSavedLogin = 'PREF_SAVED_LOGIN';
+  static const String prefHideBottomNav = 'PREF_HIDE_BOTTOM_NAV';
   static const String sessionId = 'sessionid';
 
   static const String y = 'Y';
