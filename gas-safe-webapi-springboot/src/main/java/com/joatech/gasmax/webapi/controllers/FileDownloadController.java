@@ -32,6 +32,7 @@ import org.springframework.stereotype.Component;
 
 import com.itextpdf.text.Document;
 import com.itextpdf.text.DocumentException;
+import com.itextpdf.text.Image;
 import com.itextpdf.text.PageSize;
 import com.itextpdf.text.pdf.PdfWriter;
 import com.itextpdf.tool.xml.XMLWorker;
@@ -254,11 +255,36 @@ public class FileDownloadController {
             // HTML Pipeline 생성
             HtmlPipelineContext htmlPipelineContext = new HtmlPipelineContext(cssAppliers);
             htmlPipelineContext.setTagFactory(Tags.getHtmlTagProcessorFactory());
-            // file:// URI 이미지 로드를 위한 ImageProvider 설정
+            // 서명 이미지 로드를 위한 ImageProvider 설정
             htmlPipelineContext.setImageProvider(new AbstractImageProvider() {
                 @Override
                 public String getImageRootPath() {
                     return pdfFolder1.toAbsolutePath().toString() + File.separator;
+                }
+                @Override
+                public Image retrieve(String src) {
+                    try {
+                        // file:// URI → 파일 경로 변환
+                        String path = src;
+                        if (src.startsWith("file:")) {
+                            path = new java.net.URI(src).getPath();
+                        }
+                        File imgFile = new File(path);
+                        if (!imgFile.isAbsolute()) {
+                            imgFile = new File(getImageRootPath(), path);
+                        }
+                        if (imgFile.exists()) {
+                            System.out.println("[SIGN] ImageProvider loading: " + imgFile.getAbsolutePath());
+                            Image img = Image.getInstance(imgFile.getAbsolutePath());
+                            store(src, img);
+                            return img;
+                        }
+                        System.out.println("[SIGN] ImageProvider file NOT found: " + imgFile.getAbsolutePath());
+                    } catch (Exception e) {
+                        System.out.println("[SIGN] ImageProvider error: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                    return null;
                 }
             });
 
@@ -337,14 +363,17 @@ public class FileDownloadController {
         System.out.println("[SIGN] supplierImg tag: " + (supplierImg.isEmpty() ? "(empty)" : supplierImg.substring(0, Math.min(80, supplierImg.length()))));
         System.out.println("[SIGN] customerImg tag: " + (customerImg.isEmpty() ? "(empty)" : customerImg.substring(0, Math.min(80, customerImg.length()))));
 
-        boolean hasPlaceholder = output.contains("(서명 또는 인)") || output.matches("(?s).*\\(서명\\s*또는\\s*인\\).*");
-        System.out.println("[SIGN] HTML contains placeholder '(서명 또는 인)': " + hasPlaceholder);
+        // &nbsp; 또는 일반 공백 모두 매칭하는 패턴
+        String signPlaceholderRegex = "\\(서명(?:\\s|&nbsp;)*또는(?:\\s|&nbsp;)*인\\)";
+
+        boolean hasPlaceholder = java.util.regex.Pattern.compile(signPlaceholderRegex).matcher(output).find();
+        System.out.println("[SIGN] HTML contains signature placeholder: " + hasPlaceholder);
 
         if (!supplierImg.isEmpty()) {
-            output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", Matcher.quoteReplacement(supplierImg));
+            output = output.replaceFirst(signPlaceholderRegex, Matcher.quoteReplacement(supplierImg));
         }
         if (!customerImg.isEmpty()) {
-            output = output.replaceFirst("\\(서명\\s*또는\\s*인\\)", Matcher.quoteReplacement(customerImg));
+            output = output.replaceFirst(signPlaceholderRegex, Matcher.quoteReplacement(customerImg));
         }
         return output;
     }
@@ -352,7 +381,7 @@ public class FileDownloadController {
     private String toSignatureImgTag(String filename, String role, String signRaw) {
         String src = resolveSignatureImageSource(filename, role, signRaw);
         if (src.isEmpty()) return "";
-        return "<img src='" + src + "' style='width:120px;height:48px;object-fit:contain;vertical-align:middle;' />";
+        return "<img src=\"" + src + "\" width=\"120\" height=\"48\" />";
     }
 
     private String resolveSignatureImageSource(String filename, String role, String signRaw) {
@@ -625,11 +654,36 @@ public class FileDownloadController {
             // HTML Pipeline 생성
             HtmlPipelineContext htmlPipelineContext = new HtmlPipelineContext(cssAppliers);
             htmlPipelineContext.setTagFactory(Tags.getHtmlTagProcessorFactory());
-            // file:// URI 이미지 로드를 위한 ImageProvider 설정
+            // 서명 이미지 로드를 위한 ImageProvider 설정
             htmlPipelineContext.setImageProvider(new AbstractImageProvider() {
                 @Override
                 public String getImageRootPath() {
                     return pdfFolder1.toAbsolutePath().toString() + File.separator;
+                }
+                @Override
+                public Image retrieve(String src) {
+                    try {
+                        // file:// URI → 파일 경로 변환
+                        String path = src;
+                        if (src.startsWith("file:")) {
+                            path = new java.net.URI(src).getPath();
+                        }
+                        File imgFile = new File(path);
+                        if (!imgFile.isAbsolute()) {
+                            imgFile = new File(getImageRootPath(), path);
+                        }
+                        if (imgFile.exists()) {
+                            System.out.println("[SIGN] ImageProvider loading: " + imgFile.getAbsolutePath());
+                            Image img = Image.getInstance(imgFile.getAbsolutePath());
+                            store(src, img);
+                            return img;
+                        }
+                        System.out.println("[SIGN] ImageProvider file NOT found: " + imgFile.getAbsolutePath());
+                    } catch (Exception e) {
+                        System.out.println("[SIGN] ImageProvider error: " + e.getMessage());
+                        e.printStackTrace();
+                    }
+                    return null;
                 }
             });
 
