@@ -304,21 +304,9 @@ public class FileDownloadController {
     }
 
     private String buildTwoPageContractHtml(AnCont contData) {
-        String front = AnContfiles(contData);
-        String back = AnContfile2();
-
-        if (front == null) front = "";
-        if (back == null || back.trim().isEmpty()) return front;
-
-        String normalizedFront = front
-                .replaceAll("(?i)</body>\\s*</html>\\s*$", "")
-                .replaceAll("(?i)</body>\\s*$", "")
-                .replaceAll("(?i)</html>\\s*$", "");
-
-        return normalizedFront
-                + "<div style='page-break-before: always;'></div>"
-                + back
-                + "</body></html>";
+        // Keep production generation aligned with the long-form template that was
+        // previously used for stable two-page output.
+        return AnContfileTest();
     }
 
     private String toXmlWorkerSafeHtml(String html) {
