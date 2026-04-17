@@ -268,7 +268,7 @@ public class FileDownloadController {
             2. xml 기준 html 태그 확인( ex : <p> </p> , <img/> , <col/> )
             위 조건을 지키지 않을 경우 DocumentException 발생
             */
-            String htmlStr = buildTwoPageContractHtml(ContData);
+            String htmlStr = toXmlWorkerSafeHtml(buildTwoPageContractHtml(ContData));
 
             // HTML 내용을 PDF 파일에 삽입
             StringReader stringReader = new StringReader(htmlStr);
@@ -319,6 +319,22 @@ public class FileDownloadController {
                 + "<div style='page-break-before: always;'></div>"
                 + back
                 + "</body></html>";
+    }
+
+    private String toXmlWorkerSafeHtml(String html) {
+        if (html == null) return "";
+        String out = html;
+
+        // XMLWorker parses XHTML, so common void tags must be self-closing.
+        out = out.replaceAll("(?i)<br\\s*>", "<br/>");
+        out = out.replaceAll("(?i)<hr\\s*>", "<hr/>");
+        out = out.replaceAll("(?i)<img([^>]*?)(?<!/)>", "<img$1/>");
+        out = out.replaceAll("(?i)<meta([^>]*?)(?<!/)>", "<meta$1/>");
+        out = out.replaceAll("(?i)<link([^>]*?)(?<!/)>", "<link$1/>");
+        out = out.replaceAll("(?i)<input([^>]*?)(?<!/)>", "<input$1/>");
+        out = out.replaceAll("(?i)<col([^>]*?)(?<!/)>", "<col$1/>");
+
+        return out;
     }
 
     public String AnContfiles(AnCont contData){
@@ -553,7 +569,7 @@ public class FileDownloadController {
             2. xml 기준 html 태그 확인( ex : <p> </p> , <img/> , <col/> )
             위 조건을 지키지 않을 경우 DocumentException 발생
             */
-            String htmlStr = AnContfileTest();
+            String htmlStr = toXmlWorkerSafeHtml(AnContfileTest());
 
             // HTML 내용을 PDF 파일에 삽입
             StringReader stringReader = new StringReader(htmlStr);
