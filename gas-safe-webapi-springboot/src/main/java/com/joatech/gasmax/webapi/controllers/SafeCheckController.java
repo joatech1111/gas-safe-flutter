@@ -1797,8 +1797,22 @@ public class SafeCheckController {
 				throw new InvalidSessionIdException(GasMaxErrors.ERROR_SESSION_ID_IS_INVALID);
 			}
 
+			// PDF 파일 만들기
+			Random random = new Random();
+			int length = 15;
+			StringBuilder randomString = new StringBuilder();
+			for (int i = 0; i < length; i++) {
+				char randomChar = (char) (random.nextInt(26) + 'a' + (random.nextBoolean() ? 0 : 'A' - 'a'));
+				randomString.append(randomChar);
+			}
+
 			// Read json data
 			AnCont anCont = parseJsonAnCont(false, jsonData);
+
+			fileDownloadController.createPDF(randomString.toString(), anCont);
+			String CONT_FILE_URL = downloadBaseUrl + "/download/" + randomString.toString() + ".pdf";
+			anCont.setContFileUrl(CONT_FILE_URL);
+
 			AnContService anContService = new AnContService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> mapResult = anContService.updateAnCont(anCont);
 			anContService.close();
