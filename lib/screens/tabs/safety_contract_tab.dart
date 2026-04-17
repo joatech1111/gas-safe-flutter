@@ -361,6 +361,12 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       extraQuery: {
         if (normalizedContractUrl.isNotEmpty) 'cont_file_url': normalizedContractUrl,
         if (gUrl.isNotEmpty) 'preview_url': gUrl,
+        if (_comNameController.text.trim().isNotEmpty) 'supplier_name': _comNameController.text.trim(),
+        if (customerName.isNotEmpty) 'customer_name': customerName,
+        if (contractName.isNotEmpty) 'contract_name': contractName,
+        if (address.isNotEmpty) 'address': address,
+        if (AppState.safeSwName.trim().isNotEmpty) 'inspector_name': AppState.safeSwName.trim(),
+        if (_anzDateController.text.trim().isNotEmpty) 'contract_date': _anzDateController.text.trim(),
       },
     );
     String smsMsg = '';

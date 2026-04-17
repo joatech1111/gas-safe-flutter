@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.Random;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.regex.Pattern;
 
 import java.util.HashMap;
 
@@ -993,6 +995,12 @@ public class SafeCheckController {
 			@PathVariable("sms_div") String smsDiv,
 			@RequestParam(value = "cont_file_url", required = false) Optional<String> optContFileUrl,
 			@RequestParam(value = "preview_url", required = false) Optional<String> optPreviewUrl,
+			@RequestParam(value = "supplier_name", required = false) Optional<String> optSupplierName,
+			@RequestParam(value = "customer_name", required = false) Optional<String> optCustomerName,
+			@RequestParam(value = "contract_name", required = false) Optional<String> optContractName,
+			@RequestParam(value = "address", required = false) Optional<String> optAddress,
+			@RequestParam(value = "inspector_name", required = false) Optional<String> optInspectorName,
+			@RequestParam(value = "contract_date", required = false) Optional<String> optContractDate,
 			@RequestParam("sessionid") Optional<String> optSessionId)
 					throws SessionIdNotReceivedException, InvalidSessionIdException {
 		String result = GasMaxErrors.ERROR_OK;
@@ -1014,7 +1022,16 @@ public class SafeCheckController {
 			SMSNoticesService smsNoticesService = new SMSNoticesService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> smsNoticesList = smsNoticesService.getSMSNoticesByAreaCodeAndSmsDiv(areaCode, smsDiv);
 			smsNoticesService.close();
-			applySmsUrlPlaceholders(smsNoticesList, optContFileUrl, optPreviewUrl);
+			applySmsPlaceholders(
+					smsNoticesList,
+					optContFileUrl,
+					optPreviewUrl,
+					optSupplierName,
+					optCustomerName,
+					optContractName,
+					optAddress,
+					optInspectorName,
+					optContractDate);
 			resultData = smsNoticesList; //.get(0).get("SMS_Msg");
 		}
 
@@ -1022,35 +1039,90 @@ public class SafeCheckController {
 		return apiResult;
 	}
 
-	private void applySmsUrlPlaceholders(
+	private void applySmsPlaceholders(
 			Map<String, Object> smsNoticesList,
 			Optional<String> optContFileUrl,
-			Optional<String> optPreviewUrl) {
+			Optional<String> optPreviewUrl,
+			Optional<String> optSupplierName,
+			Optional<String> optCustomerName,
+			Optional<String> optContractName,
+			Optional<String> optAddress,
+			Optional<String> optInspectorName,
+			Optional<String> optContractDate) {
 		if (smsNoticesList == null) return;
-		Object smsObj = smsNoticesList.get("SMS_Msg");
+		String smsMsgKey = findSmsMsgKey(smsNoticesList);
+		if (smsMsgKey == null) return;
+		Object smsObj = smsNoticesList.get(smsMsgKey);
 		if (!(smsObj instanceof String)) return;
 
 		String smsMsg = (String) smsObj;
 		String contFileUrl = optContFileUrl.orElse("").trim();
 		String previewUrl = optPreviewUrl.orElse("").trim();
+		String supplierName = optSupplierName.orElse("").trim();
+		String customerName = optCustomerName.orElse("").trim();
+		String contractName = optContractName.orElse("").trim();
+		String address = optAddress.orElse("").trim();
+		String inspectorName = optInspectorName.orElse("").trim();
+		String contractDate = optContractDate.orElse("").trim();
 
 		if (previewUrl.isEmpty() && !contFileUrl.isEmpty()) {
 			previewUrl = "https://docs.google.com/gview?embedded=true&url="
 					+ URLEncoder.encode(contFileUrl, StandardCharsets.UTF_8);
 		}
 
-		smsMsg = smsMsg
-				.replace("{CONT_FILE_URL}", contFileUrl)
-				.replace("{PDF_URL}", contFileUrl)
-				.replace("{DOWNLOAD_URL}", contFileUrl)
-				.replace("{계약서URL}", contFileUrl)
-				.replace("{계약서링크}", contFileUrl)
-				.replace("{계약서다운로드링크}", contFileUrl)
-				.replace("{다운로드링크}", contFileUrl)
-				.replace("{앱없이보기}", previewUrl)
-				.replace("{미리보기링크}", previewUrl);
+		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("공급자상호"), supplierName);
+		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("거래처명", "고객명"), customerName);
+		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("계약자명", "계약자"), contractName);
+		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("주소", "거래처주소"), address);
+		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("계약일"), contractDate);
+		smsMsg = replaceTemplateTokens(smsMsg, Arrays.asList("점검자", "점검원"), inspectorName);
+		smsMsg = replaceTemplateTokens(
+				smsMsg,
+				Arrays.asList(
+						"CONT_FILE_URL",
+						"PDF_URL",
+						"DOWNLOAD_URL",
+						"download_url",
+						"cont_file_url",
+						"계약서URL",
+						"계약서링크",
+						"계약서다운로드링크",
+						"다운로드링크",
+						"다운로드 링크",
+						"다운링크"),
+				contFileUrl);
+		smsMsg = replaceTemplateTokens(
+				smsMsg,
+				Arrays.asList("앱없이보기", "앱없이 보기", "미리보기링크", "미리보기 링크", "preview_url"),
+				previewUrl);
 
-		smsNoticesList.put("SMS_Msg", smsMsg);
+		smsNoticesList.put(smsMsgKey, smsMsg);
+	}
+
+	private String findSmsMsgKey(Map<String, Object> smsNoticesList) {
+		if (smsNoticesList.containsKey("SMS_Msg")) return "SMS_Msg";
+		if (smsNoticesList.containsKey("SMS_MSG")) return "SMS_MSG";
+		for (String key : smsNoticesList.keySet()) {
+			if (key == null) continue;
+			String normalized = key.replace("_", "").toLowerCase();
+			if ("smsmsg".equals(normalized)) return key;
+		}
+		return null;
+	}
+
+	private String replaceTemplateTokens(String text, List<String> keys, String value) {
+		if (text == null || text.isEmpty()) return text;
+		String output = text;
+		for (String key : keys) {
+			if (key == null || key.isEmpty()) continue;
+			String escapedKey = Pattern.quote(key);
+			output = output.replaceAll("(?i)\\{\\s*" + escapedKey + "\\s*\\}", value);
+			output = output.replaceAll("(?i)\\[\\s*" + escapedKey + "\\s*\\]", value);
+			output = output.replaceAll("(?i)\\<\\s*" + escapedKey + "\\s*\\>", value);
+			output = output.replaceAll("(?i)\\#\\s*" + escapedKey + "\\s*\\#", value);
+			output = output.replaceAll("(?i)\\$\\s*" + escapedKey + "\\s*\\$", value);
+		}
+		return output;
 	}
 
 	/*
