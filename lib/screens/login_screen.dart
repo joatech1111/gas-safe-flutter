@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import '../models/auth_login.dart';
 import '../models/combo_data.dart';
 import '../network/net_helper.dart';
@@ -23,19 +22,14 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _idController = TextEditingController(text: 'test2');
-  final _pwdController = TextEditingController(text: 'test2');
   final _phoneController = TextEditingController();
-  final _phonePwdController = TextEditingController();
+  final _pwdController = TextEditingController();
   bool _saveLogin = false;
-  bool _obscurePassword = false;
-  bool _obscurePhonePwd = false;
+  bool _obscurePassword = true;
   bool _isLoading = false;
-  bool _isDeepLinkLogin = false;
-  bool _isPhoneLogin = false; // false = ID/PWD 로그인, true = 전화번호 로그인
-  List<dynamic> _multiUserList = []; // 복수 사용자 목록
-  int _phoneStep = 0; // 0=전화번호 입력, 1=업체 선택 완료→비밀번호 입력
-  Map<String, dynamic>? _selectedUser; // 선택된 업체/사용자
+  List<dynamic> _userList = [];
+  Map<String, dynamic>? _selectedUser;
+  bool _userSelected = false; // 업체 선택 완료 여부
 
   @override
   void initState() {
@@ -43,159 +37,23 @@ class _LoginScreenState extends State<LoginScreen> {
     _performAutoLogin();
   }
 
-  /// 자동 로그인 (우선순위: 저장된 정보 > 딥링크)
+  /// 자동 로그인
   void _performAutoLogin() {
     _saveLogin = PrefsUtil.getBool(Keys.prefSavedLogin);
 
-    // 저장된 전화번호 로그인 모드 확인
-    final savedPhoneLogin = PrefsUtil.getBool('PREF_PHONE_LOGIN');
-    if (savedPhoneLogin) {
-      _isPhoneLogin = true;
-      final savedPhone = PrefsUtil.getString('PREF_PHONE_NUMBER') ?? '';
-      final savedPhonePwd = PrefsUtil.getString('PREF_PHONE_PWD') ?? '';
-      final savedImei = PrefsUtil.getString('PREF_PHONE_IMEI') ?? '';
-      if (_saveLogin && savedPhone.isNotEmpty && savedPhonePwd.isNotEmpty) {
-        _phoneController.text = savedPhone;
-        _phonePwdController.text = savedPhonePwd;
-        // 자동 로그인: 저장된 IMEI로 바로 로그인 시도
-        _phoneStep = 1;
-        _doPhoneLogin(selectedImei: savedImei.isNotEmpty ? savedImei : null);
-        return;
-      }
-    }
+    final savedPhone = PrefsUtil.getString('PREF_PHONE_NUMBER') ?? '';
+    final savedPwd = PrefsUtil.getString('PREF_PHONE_PWD') ?? '';
+    final savedImei = PrefsUtil.getString('PREF_PHONE_IMEI') ?? '';
 
-    // 우선순위 1: 저장된 로그인 정보
-    if (_saveLogin && !savedPhoneLogin) {
-      final savedId = PrefsUtil.getString(Keys.prefUserId) ?? '';
-      final savedPwd = PrefsUtil.getString(Keys.prefUserPwd) ?? '';
-      if (savedId.isNotEmpty && savedPwd.isNotEmpty) {
-        _idController.text = savedId;
-        _pwdController.text = savedPwd;
-        _doLogin();
-        return;
-      }
-    }
-
-    // 우선순위 2: 딥링크
-    if (widget.deepLinkUserId != null && widget.deepLinkUserPwd != null) {
-      _idController.text = widget.deepLinkUserId!;
-      _pwdController.text = widget.deepLinkUserPwd!;
-      _isDeepLinkLogin = true;
-      _doLogin();
-      return;
+    if (_saveLogin && savedPhone.isNotEmpty && savedPwd.isNotEmpty) {
+      _phoneController.text = savedPhone;
+      _pwdController.text = savedPwd;
+      _userSelected = true;
+      _doPhoneLogin(selectedImei: savedImei.isNotEmpty ? savedImei : null);
     }
   }
 
-  Future<void> _doLogin() async {
-    final id = _idController.text.trim();
-    final pwd = _pwdController.text.trim();
-    if (id.isEmpty || pwd.isEmpty) {
-      Fluttertoast.showToast(msg: '아이디와 비밀번호를 입력하세요.');
-      return;
-    }
-
-    setState(() => _isLoading = true);
-
-    String uuid = '';
-    String appVersion = '3.0.1010';
-    try {
-      final deviceInfo = DeviceInfoPlugin();
-      if (Theme.of(context).platform == TargetPlatform.iOS) {
-        final iosInfo = await deviceInfo.iosInfo;
-        uuid = iosInfo.identifierForVendor ?? '';
-      } else {
-        final androidInfo = await deviceInfo.androidInfo;
-        uuid = androidInfo.id;
-      }
-    } catch (_) {}
-
-    // Android와 동일: test 계정 하드코딩
-    final isTestAccount = (id == 'test');
-    final req = {
-      'loginId': id,
-      'loginPwd': isTestAccount && (pwd == '1234' || pwd == 'test') ? 'test123!@#' : pwd,
-      'uuid': isTestAccount ? '950e673c8652deb9' : uuid,
-      'mobileNumber': isTestAccount ? '01099068228' : '',
-      'appVersion': appVersion,
-    };
-
-    if (!mounted) return;
-    final resp = await NetHelper.request(context, () => NetHelper.api.authLogin(req), showProgress: false);
-    if (!mounted) return;
-
-    setState(() => _isLoading = false);
-
-    if (NetHelper.isSuccess(resp)) {
-      final resultData = resp['resultData'];
-      if (resultData != null) {
-        final authLogin = AuthLogin.fromJson(resultData);
-        AppState.setLoginUser(authLogin);
-
-        // 캐시 초기화
-        PrefsUtil.clearKeysStartWith('CACHE_SEARCH_CONDITION_');
-        PrefsUtil.clearKeysStartWith('CACHE_SAFETY_CONDITION_');
-        PrefsUtil.clearKeysStartWith('CACHE_METERING_STATUS_CONDITION_');
-        PrefsUtil.clearKeysStartWith('CACHE_SAFETY_STATUS_CONDITION_');
-
-        // 딥링크 로그인이면 자동 로그인 저장 안함
-        if (!_isDeepLinkLogin && _saveLogin) {
-          PrefsUtil.setString(Keys.prefUserId, id);
-          PrefsUtil.setString(Keys.prefUserPwd, pwd);
-          PrefsUtil.setBool('PREF_PHONE_LOGIN', false);
-        }
-        PrefsUtil.setBool(Keys.prefSavedLogin, _isDeepLinkLogin ? false : _saveLogin);
-
-        // Android와 동일: configAll(SAFE) → Safe_SW_NAME 업데이트 → 메인으로 이동
-        await _updateSafeSW(authLogin.baAreaCode?.trim() ?? '');
-      }
-    } else {
-      if (_isDeepLinkLogin) {
-        _isDeepLinkLogin = false;
-        _showDeepLinkLoginErrorDialog();
-        return;
-      }
-      final msg = _toKoreanLoginError(resp['result']) ?? '로그인에 실패했습니다.';
-      Fluttertoast.showToast(msg: msg);
-    }
-  }
-
-  /// 서버 로그인 에러 메시지 → 한글 변환
-  String? _toKoreanLoginError(dynamic result) {
-    if (result == null) return null;
-    final msg = result.toString();
-    // 이미 한글이면 그대로
-    if (RegExp(r'[\uAC00-\uD7A3]').hasMatch(msg)) return msg;
-    // 영어 에러 메시지 → 한글
-    final lower = msg.toLowerCase();
-    if (lower.contains('password') || lower.contains('pwd')) {
-      return '비밀번호가 일치하지 않습니다.';
-    }
-    if (lower.contains('not found') || lower.contains('not exist') || lower.contains('no user')) {
-      return '등록되지 않은 사용자입니다.';
-    }
-    if (lower.contains('unauthorized') || lower.contains('auth')) {
-      return '인증에 실패했습니다. 아이디와 비밀번호를 확인해주세요.';
-    }
-    if (lower.contains('locked') || lower.contains('block')) {
-      return '계정이 잠겼습니다. 관리자에게 문의해주세요.';
-    }
-    if (lower.contains('uuid') || lower.contains('device')) {
-      return '등록되지 않은 기기입니다.\n조아테크에 문의해주세요. (1566-2399)';
-    }
-    if (lower.contains('expired')) {
-      return '계정이 만료되었습니다. 관리자에게 문의해주세요.';
-    }
-    if (lower.contains('timeout') || lower.contains('timed out')) {
-      return '서버 연결 시간이 초과되었습니다.';
-    }
-    if (lower.contains('connection') || lower.contains('network')) {
-      return '네트워크 연결에 실패했습니다.';
-    }
-    // 알 수 없는 영어 메시지는 기본 한글로
-    return '로그인에 실패했습니다.\n아이디와 비밀번호를 확인해주세요.';
-  }
-
-  /// [Step 0] 전화번호로 업체 목록 조회
+  /// [Step 1] 전화번호로 업체 목록 조회
   Future<void> _doPhoneLookup() async {
     final phone = _phoneController.text.trim().replaceAll('-', '');
     if (phone.isEmpty) {
@@ -206,7 +64,11 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     if (!mounted) return;
-    final resp = await NetHelper.request(context, () => NetHelper.api.authSearchByPhone(phone), showProgress: false);
+    final resp = await NetHelper.request(
+      context,
+      () => NetHelper.api.authSearchByPhone(phone),
+      showProgress: false,
+    );
     if (!mounted) return;
 
     setState(() => _isLoading = false);
@@ -215,29 +77,44 @@ class _LoginScreenState extends State<LoginScreen> {
 
     final resultData = resp['resultData'];
 
-    // resultData가 List이면 (복수 또는 단일) 업체 목록 BottomSheet 표시
     if (resultData is List && resultData.isNotEmpty) {
-      _multiUserList = resultData;
-      _showCompanyBottomSheet();
+      _userList = resultData;
+      if (_userList.length == 1) {
+        // 단일 사용자 → 자동 선택
+        setState(() {
+          _selectedUser = _userList.first as Map<String, dynamic>;
+          _userSelected = true;
+        });
+      } else {
+        // 복수 사용자 → BottomSheet
+        _showUserSelectSheet();
+      }
       return;
     }
 
-    // resultData가 Map이면 단일 사용자 → 바로 목록 1건으로 BottomSheet 표시
     if (resultData is Map<String, dynamic>) {
-      _multiUserList = [resultData];
-      _showCompanyBottomSheet();
+      _userList = [resultData];
+      setState(() {
+        _selectedUser = resultData;
+        _userSelected = true;
+      });
       return;
     }
 
-    // 실패
-    final msg = _toKoreanLoginError(resp['result']) ?? '등록된 업체가 없습니다.\n전화번호를 확인해주세요.';
+    final msg = _toKoreanLoginError(resp['result']) ??
+        '등록된 업체가 없습니다.\n전화번호를 확인해주세요.';
     Fluttertoast.showToast(msg: msg);
   }
 
-  /// [Step 1] 업체 선택 후 비밀번호로 로그인
+  /// [Step 2] 비밀번호로 로그인
   Future<void> _doPhoneLogin({String? selectedImei}) async {
     final phone = _phoneController.text.trim().replaceAll('-', '');
-    final pwd = _phonePwdController.text.trim();
+    final pwd = _pwdController.text.trim();
+
+    if (phone.isEmpty) {
+      Fluttertoast.showToast(msg: '전화번호를 입력하세요.');
+      return;
+    }
     if (pwd.isEmpty) {
       Fluttertoast.showToast(msg: '비밀번호를 입력하세요.');
       return;
@@ -256,7 +133,11 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (!mounted) return;
-    final resp = await NetHelper.request(context, () => NetHelper.api.authLoginByPhone(req), showProgress: false);
+    final resp = await NetHelper.request(
+      context,
+      () => NetHelper.api.authLoginByPhone(req),
+      showProgress: false,
+    );
     if (!mounted) return;
 
     setState(() => _isLoading = false);
@@ -265,11 +146,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (NetHelper.isSuccess(resp)) {
       final resultData = resp['resultData'];
-      // resultData가 List인 경우 selectedImei로 필터링 또는 첫번째 사용
       dynamic singleData;
       if (resultData is List && resultData.isNotEmpty) {
         if (imei != null) {
-          singleData = resultData.where((u) => u['HP_IMEI'] == imei).firstOrNull ?? resultData.first;
+          singleData = resultData
+                  .where((u) => u['HP_IMEI'] == imei)
+                  .firstOrNull ??
+              resultData.first;
         } else {
           singleData = resultData.first;
         }
@@ -278,7 +161,8 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (singleData != null) {
-        final authLogin = AuthLogin.fromJson(singleData as Map<String, dynamic>);
+        final authLogin =
+            AuthLogin.fromJson(singleData as Map<String, dynamic>);
         AppState.setLoginUser(authLogin);
 
         PrefsUtil.clearKeysStartWith('CACHE_SEARCH_CONDITION_');
@@ -299,13 +183,110 @@ class _LoginScreenState extends State<LoginScreen> {
         await _updateSafeSW(authLogin.baAreaCode?.trim() ?? '');
       }
     } else {
-      final msg = _toKoreanLoginError(resp['result']) ?? '비밀번호가 일치하지 않습니다.';
+      final msg =
+          _toKoreanLoginError(resp['result']) ?? '비밀번호가 일치하지 않습니다.';
       Fluttertoast.showToast(msg: msg);
     }
   }
 
-  /// 업체 목록 BottomSheet 표시
-  void _showCompanyBottomSheet() {
+  /// 로그인 버튼 클릭 시 실행
+  Future<void> _onLoginPressed() async {
+    final phone = _phoneController.text.trim().replaceAll('-', '');
+    if (phone.isEmpty) {
+      Fluttertoast.showToast(msg: '전화번호를 입력하세요.');
+      return;
+    }
+    final pwd = _pwdController.text.trim();
+    if (pwd.isEmpty) {
+      Fluttertoast.showToast(msg: '비밀번호를 입력하세요.');
+      return;
+    }
+
+    // 이미 업체가 선택되어 있으면 바로 로그인
+    if (_userSelected && _selectedUser != null) {
+      _doPhoneLogin();
+      return;
+    }
+
+    // 업체 조회 → 단일이면 바로 로그인, 복수면 BottomSheet
+    setState(() => _isLoading = true);
+
+    if (!mounted) return;
+    final resp = await NetHelper.request(
+      context,
+      () => NetHelper.api.authSearchByPhone(phone),
+      showProgress: false,
+    );
+    if (!mounted) return;
+
+    final resultData = resp['resultData'];
+
+    if (resultData is List && resultData.isNotEmpty) {
+      _userList = resultData;
+      if (_userList.length == 1) {
+        _selectedUser = _userList.first as Map<String, dynamic>;
+        _userSelected = true;
+        setState(() => _isLoading = false);
+        _doPhoneLogin();
+      } else {
+        setState(() => _isLoading = false);
+        _showUserSelectSheet();
+      }
+      return;
+    }
+
+    if (resultData is Map<String, dynamic>) {
+      _userList = [resultData];
+      _selectedUser = resultData;
+      _userSelected = true;
+      setState(() => _isLoading = false);
+      _doPhoneLogin();
+      return;
+    }
+
+    setState(() => _isLoading = false);
+    final msg = _toKoreanLoginError(resp['result']) ??
+        '등록된 업체가 없습니다.\n전화번호를 확인해주세요.';
+    Fluttertoast.showToast(msg: msg);
+  }
+
+  /// 서버 로그인 에러 메시지 → 한글 변환
+  String? _toKoreanLoginError(dynamic result) {
+    if (result == null) return null;
+    final msg = result.toString();
+    if (RegExp(r'[\uAC00-\uD7A3]').hasMatch(msg)) return msg;
+    final lower = msg.toLowerCase();
+    if (lower.contains('password') || lower.contains('pwd')) {
+      return '비밀번호가 일치하지 않습니다.';
+    }
+    if (lower.contains('not found') ||
+        lower.contains('not exist') ||
+        lower.contains('no user')) {
+      return '등록되지 않은 사용자입니다.';
+    }
+    if (lower.contains('unauthorized') || lower.contains('auth')) {
+      return '인증에 실패했습니다.';
+    }
+    if (lower.contains('locked') || lower.contains('block')) {
+      return '계정이 잠겼습니다. 관리자에게 문의해주세요.';
+    }
+    if (lower.contains('uuid') || lower.contains('device')) {
+      return '등록되지 않은 기기입니다.\n조아테크에 문의해주세요. (1566-2399)';
+    }
+    if (lower.contains('expired')) {
+      return '계정이 만료되었습니다. 관리자에게 문의해주세요.';
+    }
+    if (lower.contains('timeout') || lower.contains('timed out')) {
+      return '서버 연결 시간이 초과되었습니다.';
+    }
+    if (lower.contains('connection') || lower.contains('network')) {
+      return '네트워크 연결에 실패했습니다.';
+    }
+    return '로그인에 실패했습니다.\n전화번호와 비밀번호를 확인해주세요.';
+  }
+
+  /// 사용자 선택 BottomSheet
+  void _showUserSelectSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -337,11 +318,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 padding: const EdgeInsets.fromLTRB(20, 8, 12, 12),
                 child: Row(
                   children: [
-                    const Icon(Icons.business, color: Color(0xFF1976D2), size: 22),
+                    const Icon(Icons.people,
+                        color: Color(0xFF1976D2), size: 22),
                     const SizedBox(width: 8),
                     Text(
-                      '업체 선택 (${_multiUserList.length}건)',
-                      style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: Color(0xFF333333)),
+                      '사용자 선택 (${_userList.length}건)',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
                     ),
                     const Spacer(),
                     IconButton(
@@ -353,15 +339,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const Divider(height: 1),
+              // 안내 문구
+              Container(
+                width: double.infinity,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                color: const Color(0xFFFFF8E1),
+                child: const Text(
+                  '해당 전화번호로 등록된 사용자가 여러 명입니다.\n로그인할 사용자를 선택해주세요.',
+                  style: TextStyle(fontSize: 13, color: Color(0xFF795548)),
+                ),
+              ),
               // 목록
               Flexible(
                 child: ListView.separated(
                   shrinkWrap: true,
                   padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: _multiUserList.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1, indent: 60, endIndent: 16),
+                  itemCount: _userList.length,
+                  separatorBuilder: (_, __) =>
+                      const Divider(height: 1, indent: 60, endIndent: 16),
                   itemBuilder: (_, i) {
-                    final user = _multiUserList[i];
+                    final user = _userList[i];
                     final name = (user['Login_Name'] ?? '').toString();
                     final id = (user['Login_User'] ?? '').toString();
                     final company = (user['Login_Co'] ?? '').toString();
@@ -374,24 +372,35 @@ class _LoginScreenState extends State<LoginScreen> {
                         Navigator.pop(ctx);
                         setState(() {
                           _selectedUser = user;
-                          _phoneStep = 1;
+                          _userSelected = true;
                         });
+                        // 선택 후 바로 로그인 시도
+                        _doPhoneLogin();
                       },
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 14),
                         child: Row(
                           children: [
                             Container(
-                              width: 34,
-                              height: 34,
+                              width: 40,
+                              height: 40,
                               decoration: BoxDecoration(
-                                color: isActive ? const Color(0xFF1976D2) : const Color(0xFFBBBBBB),
+                                color: isActive
+                                    ? const Color(0xFF1976D2)
+                                    : const Color(0xFFBBBBBB),
                                 shape: BoxShape.circle,
                               ),
                               alignment: Alignment.center,
                               child: Text(
-                                '${i + 1}',
-                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                                name.isNotEmpty
+                                    ? name.substring(0, 1)
+                                    : '${i + 1}',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
                               ),
                             ),
                             const SizedBox(width: 14),
@@ -403,20 +412,35 @@ class _LoginScreenState extends State<LoginScreen> {
                                     children: [
                                       Flexible(
                                         child: Text(
-                                          company.isNotEmpty ? company : (name.isNotEmpty ? name : id),
-                                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF333333)),
+                                          company.isNotEmpty
+                                              ? company
+                                              : (name.isNotEmpty ? name : id),
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Color(0xFF333333),
+                                          ),
                                           overflow: TextOverflow.ellipsis,
                                         ),
                                       ),
                                       if (isActive) ...[
                                         const SizedBox(width: 6),
                                         Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 6, vertical: 2),
                                           decoration: BoxDecoration(
                                             color: const Color(0xFF4CAF50),
-                                            borderRadius: BorderRadius.circular(4),
+                                            borderRadius:
+                                                BorderRadius.circular(4),
                                           ),
-                                          child: const Text('사용중', style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+                                          child: const Text(
+                                            '사용중',
+                                            style: TextStyle(
+                                              fontSize: 11,
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
                                         ),
                                       ],
                                     ],
@@ -424,12 +448,16 @@ class _LoginScreenState extends State<LoginScreen> {
                                   const SizedBox(height: 3),
                                   Text(
                                     '${name.isNotEmpty ? "$name / " : ""}$id${model.isNotEmpty ? " / $model" : ""}',
-                                    style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      color: Color(0xFF888888),
+                                    ),
                                   ),
                                 ],
                               ),
                             ),
-                            const Icon(Icons.chevron_right, color: Color(0xFFCCCCCC), size: 22),
+                            const Icon(Icons.chevron_right,
+                                color: Color(0xFFCCCCCC), size: 22),
                           ],
                         ),
                       ),
@@ -444,7 +472,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// Android의 updateSafeSW와 동일 - 안전관리자 이름을 조회하여 설정
+  /// 안전관리자 이름 조회 후 메인 이동
   Future<void> _updateSafeSW(String areaCode) async {
     if (areaCode.isEmpty) {
       _goToMain();
@@ -455,10 +483,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (NetHelper.isSuccess(resp) && resp['resultData'] != null) {
       final list = resp['resultData'];
       if (list is List) {
-        final comboList = list.map((e) => ComboData.fromJson(e).toTrim()).toList();
+        final comboList =
+            list.map((e) => ComboData.fromJson(e).toTrim()).toList();
         final user = AppState.loginUser;
         if (user != null) {
-          final sw = comboList.where((c) => c.cd?.trim() == user.safeSwCode?.trim()).firstOrNull;
+          final sw = comboList
+              .where((c) => c.cd?.trim() == user.safeSwCode?.trim())
+              .firstOrNull;
           if (sw != null) {
             user.safeSwName = sw.getCdName();
             AppState.setLoginUser(user);
@@ -467,7 +498,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
 
-    // configAll도 로드
     final configResp = await NetHelper.api.configAll(areaCode);
     if (NetHelper.isSuccess(configResp) && configResp['resultData'] != null) {
       AppState.parseConfigAll(configResp['resultData']);
@@ -483,24 +513,6 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showDeepLinkLoginErrorDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) => AlertDialog(
-        title: const Text('로그인 실패'),
-        content: const Text(
-          '아이디 또는 비밀번호가 일치하지 않거나 등록되지 않은 사용자입니다.\n\n'
-          '기존에 사용하던 핸드폰과 DB에 등록된 핸드폰의 UUID가 일치해야 합니다.\n\n'
-          '조아테크에 문의하세요.\n고객지원센터: 1566-2399',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('확인')),
-        ],
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -512,75 +524,169 @@ class _LoginScreenState extends State<LoginScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // 타이틀
-                const Text('가스 안전관리 2026', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Color(0xFF333333))),
+                const Text(
+                  '가스 안전관리 2026',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF333333),
+                  ),
+                ),
                 const SizedBox(height: 25),
-                // 로고
-                Image.asset('assets/images/login_logo.png', width: 200, height: 140, fit: BoxFit.contain),
-                const SizedBox(height: 24),
-                // 로그인 모드 전환 탭
-                _buildLoginModeToggle(),
-                const SizedBox(height: 20),
-                // 로그인 폼
-                _isPhoneLogin ? _buildPhoneLoginForm() : _buildIdPwdLoginForm(),
+                Image.asset(
+                  'assets/images/login_logo.png',
+                  width: 200,
+                  height: 140,
+                  fit: BoxFit.contain,
+                ),
+                const SizedBox(height: 32),
+
+                // 전화번호 입력
+                TextField(
+                  controller: _phoneController,
+                  keyboardType: TextInputType.phone,
+                  inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                  decoration: InputDecoration(
+                    labelText: '전화번호',
+                    hintText: '전화번호 (- 없이)',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    prefixIcon: const Icon(Icons.phone),
+                  ),
+                  style: const TextStyle(fontSize: 18),
+                  onChanged: (_) {
+                    // 전화번호 변경 시 이전 선택 초기화
+                    if (_userSelected) {
+                      setState(() {
+                        _userList = [];
+                        _selectedUser = null;
+                        _userSelected = false;
+                      });
+                    }
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // 선택된 사용자 표시
+                if (_userSelected && _selectedUser != null)
+                  _buildSelectedUserChip(),
+
+                // 비밀번호 입력
+                TextField(
+                  controller: _pwdController,
+                  obscureText: _obscurePassword,
+                  decoration: InputDecoration(
+                    labelText: '비밀번호',
+                    hintText: '비밀번호를 입력하세요',
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                    prefixIcon: const Icon(Icons.lock),
+                    suffixIcon: IconButton(
+                      icon: Icon(_obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _obscurePassword = !_obscurePassword),
+                    ),
+                  ),
+                  style: const TextStyle(fontSize: 18),
+                  onSubmitted: (_) => _onLoginPressed(),
+                ),
                 const SizedBox(height: 8),
+
                 // 로그인 정보 저장
                 Row(
                   children: [
                     Checkbox(
                       value: _saveLogin,
-                      onChanged: (v) => setState(() => _saveLogin = v ?? false),
+                      onChanged: (v) =>
+                          setState(() => _saveLogin = v ?? false),
                     ),
-                    const Text('로그인 정보 저장', style: TextStyle(fontSize: 15)),
+                    const Text('로그인 정보 저장',
+                        style: TextStyle(fontSize: 15)),
                   ],
                 ),
                 const SizedBox(height: 20),
+
                 // 로그인 / 가입신청 버튼
-                if (!_isPhoneLogin)
-                  Row(
-                    children: [
-                      Expanded(
-                        child: SizedBox(
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: _isLoading ? null : _doLogin,
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF555555),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 2,
+                      child: SizedBox(
+                        height: 52,
+                        child: ElevatedButton(
+                          onPressed: _isLoading ? null : _onLoginPressed,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF1976D2),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: _isLoading
+                              ? const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(
+                                      color: Colors.white, strokeWidth: 2),
+                                )
+                              : const Text(
+                                  '로그인',
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: SizedBox(
+                        height: 52,
+                        child: OutlinedButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) => const SignUpScreen()),
+                            );
+                          },
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF999999)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8)),
+                          ),
+                          child: const Text(
+                            '가입신청',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: Color(0xFF666666),
                             ),
-                            child: _isLoading
-                                ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                                : const Text('로그인', style: TextStyle(fontSize: 18, color: Colors.white)),
                           ),
                         ),
                       ),
-                      const SizedBox(width: 16),
-                      Expanded(
-                        child: SizedBox(
-                          height: 48,
-                          child: ElevatedButton(
-                            onPressed: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (_) => const SignUpScreen()));
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF555555),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            ),
-                            child: const Text('가입신청', style: TextStyle(fontSize: 18, color: Colors.white)),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
+                ),
                 const SizedBox(height: 24),
+
                 // 버전 표시
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   decoration: BoxDecoration(
                     color: const Color(0xFF555555),
                     borderRadius: BorderRadius.circular(20),
                   ),
-                  child: const Text('버전 3.0.1010', style: TextStyle(fontSize: 14, color: Colors.white, fontWeight: FontWeight.bold)),
+                  child: const Text(
+                    '버전 3.0.1010',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -590,237 +696,66 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// 로그인 모드 전환 토글 (ID/PWD <-> 전화번호)
-  Widget _buildLoginModeToggle() {
-    return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F0F0),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() { _isPhoneLogin = false; _multiUserList = []; _selectedUser = null; _phoneStep = 0; _phonePwdController.clear(); }),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: !_isPhoneLogin ? const Color(0xFF555555) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  'UUID / ID / 비밀번호',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: !_isPhoneLogin ? Colors.white : const Color(0xFF888888),
-                  ),
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _isPhoneLogin = true),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: _isPhoneLogin ? const Color(0xFF1976D2) : Colors.transparent,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '전화번호',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: _isPhoneLogin ? Colors.white : const Color(0xFF888888),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+  /// 선택된 사용자 칩 위젯
+  Widget _buildSelectedUserChip() {
+    final company = (_selectedUser!['Login_Co'] ?? '').toString();
+    final name = (_selectedUser!['Login_Name'] ?? '').toString();
+    final id = (_selectedUser!['Login_User'] ?? '').toString();
 
-  /// ID/PWD 로그인 폼
-  Widget _buildIdPwdLoginForm() {
-    return Column(
-      children: [
-        TextField(
-          controller: _idController,
-          decoration: InputDecoration(
-            labelText: '아이디',
-            hintText: '아이디를 입력하세요',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            prefixIcon: const Icon(Icons.person),
-          ),
-          style: const TextStyle(fontSize: 18),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: const Color(0xFFE3F2FD),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: const Color(0xFF1976D2), width: 1),
         ),
-        const SizedBox(height: 12),
-        TextField(
-          controller: _pwdController,
-          obscureText: _obscurePassword,
-          decoration: InputDecoration(
-            labelText: '비밀번호',
-            hintText: '비밀번호를 입력하세요',
-            border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-            prefixIcon: const Icon(Icons.lock),
-            suffixIcon: IconButton(
-              icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-              onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-            ),
-          ),
-          style: const TextStyle(fontSize: 18),
-          onSubmitted: (_) => _doLogin(),
-        ),
-      ],
-    );
-  }
-
-  /// 전화번호 로그인 폼 (3단계)
-  Widget _buildPhoneLoginForm() {
-    return Column(
-      children: [
-        // ── Step 0: 전화번호 입력 + 조회 버튼 ──
-        Row(
+        child: Row(
           children: [
-            Expanded(
-              child: TextField(
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                decoration: InputDecoration(
-                  labelText: '전화번호',
-                  hintText: '전화번호 (- 없이)',
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-                  prefixIcon: const Icon(Icons.phone),
-                ),
-                style: const TextStyle(fontSize: 18),
-                onChanged: (_) {
-                  // 전화번호 변경 시 이전 조회 결과 초기화
-                  if (_multiUserList.isNotEmpty) {
-                    setState(() {
-                      _multiUserList = [];
-                      _selectedUser = null;
-                      _phoneStep = 0;
-                      _phonePwdController.clear();
-                    });
-                  }
-                },
-                onSubmitted: (_) => _doPhoneLookup(),
-              ),
-            ),
+            const Icon(Icons.person, color: Color(0xFF1976D2), size: 20),
             const SizedBox(width: 8),
-            SizedBox(
-              height: 56,
-              width: 80,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _doPhoneLookup,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1976D2),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                  padding: EdgeInsets.zero,
+            Expanded(
+              child: Text(
+                '${company.isNotEmpty ? "$company · " : ""}${name.isNotEmpty ? name : id}',
+                style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFF1976D2),
                 ),
-                child: _isLoading && _phoneStep == 0
-                    ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                    : const Text('조회', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
+            if (_userList.length > 1)
+              GestureDetector(
+                onTap: _showUserSelectSheet,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF1976D2),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    '변경',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
-
-        // ── Step 1: 선택된 업체 표시 + 비밀번호 ──
-        if (_phoneStep == 1 && _selectedUser != null) ...[
-          const SizedBox(height: 16),
-          // 선택된 업체 표시
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-            decoration: BoxDecoration(
-              color: const Color(0xFFE3F2FD),
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFF1976D2), width: 1.5),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.business, color: Color(0xFF1976D2), size: 22),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        (_selectedUser!['Login_Co'] ?? '').toString().isNotEmpty
-                            ? _selectedUser!['Login_Co']
-                            : _selectedUser!['Login_Name'] ?? '',
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF1976D2)),
-                      ),
-                      Text(
-                        '${_selectedUser!['Login_Name'] ?? ''} (${_selectedUser!['Login_User'] ?? ''})',
-                        style: const TextStyle(fontSize: 13, color: Color(0xFF666666)),
-                      ),
-                    ],
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    _phonePwdController.clear();
-                    _showCompanyBottomSheet();
-                  },
-                  child: const Icon(Icons.edit, color: Color(0xFF1976D2), size: 20),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          // 비밀번호 입력
-          TextField(
-            controller: _phonePwdController,
-            obscureText: _obscurePhonePwd,
-            autofocus: true,
-            decoration: InputDecoration(
-              labelText: '비밀번호',
-              hintText: '비밀번호를 입력하세요',
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
-              prefixIcon: const Icon(Icons.lock),
-              suffixIcon: IconButton(
-                icon: Icon(_obscurePhonePwd ? Icons.visibility_off : Icons.visibility),
-                onPressed: () => setState(() => _obscurePhonePwd = !_obscurePhonePwd),
-              ),
-            ),
-            style: const TextStyle(fontSize: 18),
-            onSubmitted: (_) => _doPhoneLogin(),
-          ),
-          const SizedBox(height: 12),
-          // 로그인 버튼
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : () => _doPhoneLogin(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1976D2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-              ),
-              child: _isLoading && _phoneStep == 1
-                  ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                  : const Text('로그인', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.white)),
-            ),
-          ),
-        ],
-      ],
+      ),
     );
   }
 
   @override
   void dispose() {
-    _idController.dispose();
-    _pwdController.dispose();
     _phoneController.dispose();
-    _phonePwdController.dispose();
+    _pwdController.dispose();
     super.dispose();
   }
 }

@@ -295,6 +295,10 @@ class MainScreen extends StatelessWidget {
       PrefsUtil.remove(Keys.prefSavedLogin);
       PrefsUtil.remove(Keys.prefUserId);
       PrefsUtil.remove(Keys.prefUserPwd);
+      PrefsUtil.remove('PREF_PHONE_LOGIN');
+      PrefsUtil.remove('PREF_PHONE_NUMBER');
+      PrefsUtil.remove('PREF_PHONE_PWD');
+      PrefsUtil.remove('PREF_PHONE_IMEI');
       if (context.mounted) {
         Navigator.of(context).pushAndRemoveUntil(
           MaterialPageRoute(builder: (_) => const LoginScreen()),
