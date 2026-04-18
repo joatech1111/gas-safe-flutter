@@ -612,7 +612,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 Row(
                   children: [
                     Expanded(
-                      flex: 2,
                       child: SizedBox(
                         height: 52,
                         child: ElevatedButton(
@@ -644,7 +643,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Expanded(
                       child: SizedBox(
                         height: 52,
-                        child: OutlinedButton(
+                        child: ElevatedButton(
                           onPressed: () {
                             Navigator.push(
                               context,
@@ -652,16 +651,17 @@ class _LoginScreenState extends State<LoginScreen> {
                                   builder: (_) => const SignUpScreen()),
                             );
                           },
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF999999)),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0D1B3E),
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8)),
                           ),
                           child: const Text(
                             '가입신청',
                             style: TextStyle(
-                              fontSize: 16,
-                              color: Color(0xFF666666),
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
                             ),
                           ),
                         ),
