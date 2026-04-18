@@ -28,6 +28,7 @@ class SafetyContractTab extends StatefulWidget {
 class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKeepAliveClientMixin {
   bool _isLoading = true;
   bool _isNew = false;
+  bool _isPreviewLoading = false;
   String? _anzSno;
   String? _pdfFileUrl;
   bool _contractContentExpanded = true;
@@ -251,14 +252,20 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
   }
 
   Future<void> _previewPdf() async {
+    if (_isPreviewLoading) return;
+    setState(() => _isPreviewLoading = true);
+    // UI가 로딩 상태를 그릴 시간 확보
+    await Future.delayed(const Duration(milliseconds: 50));
     try {
       final pdfData = _buildContractPdfData();
       final pdfBytes = await ContractPdfService.generate(pdfData);
       if (!mounted) return;
+      setState(() => _isPreviewLoading = false);
       Navigator.push(context, MaterialPageRoute(
         builder: (_) => _ContractPdfPreviewScreen(pdfBytes: pdfBytes),
       ));
     } catch (e) {
+      if (mounted) setState(() => _isPreviewLoading = false);
       Fluttertoast.showToast(msg: 'PDF 미리보기 실패: $e');
     }
   }
@@ -989,7 +996,22 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
         children: [
           SizedBox(
             width: double.infinity,
-            child: _actionBtn('계약서 미리보기', const Color(0xFF1976D2), _previewPdf),
+            child: GestureDetector(
+              onTap: _isPreviewLoading ? null : _previewPdf,
+              child: Container(
+                height: 44, alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  border: Border.all(color: const Color(0xFF1976D2), width: 1.5),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: _isPreviewLoading
+                    ? const SizedBox(
+                        width: 22, height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF1976D2)),
+                      )
+                    : const Text('계약서 미리보기', style: TextStyle(fontSize: 14, color: Color(0xFF1976D2), fontWeight: FontWeight.bold)),
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           Row(
