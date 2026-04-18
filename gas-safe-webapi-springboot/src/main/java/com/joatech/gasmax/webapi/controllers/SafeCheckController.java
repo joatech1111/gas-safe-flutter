@@ -1902,19 +1902,6 @@ public class SafeCheckController {
 				throw new InvalidSessionIdException(GasMaxErrors.ERROR_SESSION_ID_IS_INVALID);
 			}
 
-			// PDF 파일 만들기
-			Random random = new Random();
-			int length = 15;  // 생성할 문자열의 길이
-
-			StringBuilder randomString = new StringBuilder();
-
-			for (int i = 0; i < length; i++) {
-				// 대소문자 알파벳을 포함한 난수 생성
-				char randomChar = (char) (random.nextInt(26) + 'a' + (random.nextBoolean() ? 0 : 'A' - 'a'));
-				randomString.append(randomChar);
-			}
-
-
 			// Read json data
 			AnCont anCont = parseJsonAnCont(false, jsonData);
 			ObjectMapper mapper = new ObjectMapper();
@@ -1923,11 +1910,25 @@ public class SafeCheckController {
 			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
 			logger.info("create-cont sign payload lengths - customer:{}, supplier:{}", safeLength(customerSignRaw), safeLength(supplierSignRaw));
 
-			fileDownloadController.createPDF(randomString.toString(), anCont, customerSignRaw, supplierSignRaw);
-
-			String CONT_FILE_URL = downloadBaseUrl + "/download/" + randomString.toString() + ".pdf";
-
-
+			// 클라이언트에서 이미 PDF를 업로드했으면 서버 PDF 생성 건너뛰기
+			String clientContFileUrl = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "CONT_FILE_URL");
+			String CONT_FILE_URL;
+			if (clientContFileUrl != null && !clientContFileUrl.trim().isEmpty()) {
+				CONT_FILE_URL = clientContFileUrl.trim();
+				logger.info("Using client-uploaded PDF URL: {}", CONT_FILE_URL);
+			} else {
+				// PDF 파일 만들기 (클라이언트에서 PDF를 보내지 않은 경우 서버에서 생성)
+				Random random = new Random();
+				int length = 15;
+				StringBuilder randomString = new StringBuilder();
+				for (int i = 0; i < length; i++) {
+					char randomChar = (char) (random.nextInt(26) + 'a' + (random.nextBoolean() ? 0 : 'A' - 'a'));
+					randomString.append(randomChar);
+				}
+				fileDownloadController.createPDF(randomString.toString(), anCont, customerSignRaw, supplierSignRaw);
+				CONT_FILE_URL = downloadBaseUrl + "/download/" + randomString.toString() + ".pdf";
+				logger.info("Server-generated PDF URL: {}", CONT_FILE_URL);
+			}
 
 			anCont.setContFileUrl(CONT_FILE_URL);
 			// 계약서 PDF  만들어 저장 하기..
@@ -2022,10 +2023,20 @@ public class SafeCheckController {
 			String customerSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign");
 			String supplierSignRaw = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "ANZ_Sign_C");
 			logger.info("update-cont sign payload lengths - customer:{}, supplier:{}, anzSno:{}", safeLength(customerSignRaw), safeLength(supplierSignRaw), anCont.getAnzSno());
-			// 매번 PDF 재생성 (서명 갱신 반영)
-			String generatedFileName = generateContractPdfFileName();
-			fileDownloadController.createPDF(generatedFileName, anCont, customerSignRaw, supplierSignRaw);
-			String contFileUrl = downloadBaseUrl + "/download/" + generatedFileName + ".pdf";
+
+			// 클라이언트에서 이미 PDF를 업로드했으면 서버 PDF 생성 건너뛰기
+			String clientContFileUrl = GasMaxUtility.parseJsonNodeToString(jsonRootNode, "CONT_FILE_URL");
+			String contFileUrl;
+			if (clientContFileUrl != null && !clientContFileUrl.trim().isEmpty()) {
+				contFileUrl = clientContFileUrl.trim();
+				logger.info("Using client-uploaded PDF URL: {}", contFileUrl);
+			} else {
+				// PDF 재생성 (클라이언트에서 PDF를 보내지 않은 경우)
+				String generatedFileName = generateContractPdfFileName();
+				fileDownloadController.createPDF(generatedFileName, anCont, customerSignRaw, supplierSignRaw);
+				contFileUrl = downloadBaseUrl + "/download/" + generatedFileName + ".pdf";
+				logger.info("Server-generated PDF URL: {}", contFileUrl);
+			}
 			anCont.setContFileUrl(contFileUrl);
 			AnContService anContService = new AnContService(appUserSafe.getServerIp(), Integer.parseInt(appUserSafe.getServerPort()), appUserSafe.getServerDBName(), appUserSafe.getServerUser(), appUserSafe.getServerPassword());
 			Map<String, Object> mapResult = anContService.updateAnCont(anCont);
