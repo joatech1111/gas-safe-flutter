@@ -1,3 +1,4 @@
+import 'dart:typed_data';
 import '../../widgets/logo_loader.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -6,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../models/safety_customer_result_data.dart';
 import '../../models/safety_check_contract_result_data.dart';
 import '../../network/net_helper.dart';
+import 'package:printing/printing.dart';
 import '../../services/contract_pdf_service.dart';
 import '../../utils/app_state.dart';
 import '../../utils/date_util.dart';
@@ -212,6 +214,55 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     } catch (_) {}
   }
 
+  ContractPdfData _buildContractPdfData() {
+    final custSign = _signatureCustomer ?? '';
+    final comSign = _signatureSupplier ?? '';
+    return ContractPdfData(
+      comNo: _comNoController.text,
+      comName: _comNameController.text,
+      comTel: _comTelController.text,
+      comHp: _comHpController.text,
+      comCeoName: _comCeoNameController.text,
+      custComNo: _custComNoController.text,
+      custComName: _custComNameController.text,
+      custTel: _custTelController.text,
+      cuGongName: _cuGongNameController.text,
+      cuAddr1: _cuAddr1,
+      cuAddr2: _cuAddr2,
+      cuGongNo: _cuGongNo.isNotEmpty ? _cuGongNo : _contractNoController.text,
+      anzDate: _ensureDate(_anzDateController.text, DateUtil.today()),
+      anzDateF: _ensureDate(_anzDateFController.text, DateUtil.today()),
+      anzDateT: _ensureDate(_anzDateTController.text, DateUtil.afterDays(365)),
+      saleType: _saleType,
+      contType: _contType,
+      useCyl: _cylController.text,
+      useMeter: _meterController.text,
+      useTrans: _transController.text,
+      useVapor: _vaporController.text,
+      usePipe: _pipeController.text,
+      useFacility: _facilityController.text,
+      centerSi: _centerSiController.text,
+      centerConsumer: _centerConsumerController.text,
+      centerKgs: _centerKgsController.text,
+      centerGas: _centerGasController.text,
+      supplierSign: comSign.isNotEmpty ? comSign : null,
+      customerSign: custSign.isNotEmpty ? custSign : null,
+    );
+  }
+
+  Future<void> _previewPdf() async {
+    try {
+      final pdfData = _buildContractPdfData();
+      final pdfBytes = await ContractPdfService.generate(pdfData);
+      if (!mounted) return;
+      Navigator.push(context, MaterialPageRoute(
+        builder: (_) => _ContractPdfPreviewScreen(pdfBytes: pdfBytes),
+      ));
+    } catch (e) {
+      Fluttertoast.showToast(msg: 'PDF 미리보기 실패: $e');
+    }
+  }
+
   Future<void> _save({bool sendSMS = false}) async {
     final custSign = _signatureCustomer ?? '';
     final comSign = _signatureSupplier ?? '';
@@ -220,41 +271,13 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     try { pos = await Geolocator.getCurrentPosition(); } catch (_) {}
 
     // ─── 1. 클라이언트에서 PDF 생성 ───
+    debugPrint('[PDF] 서명 데이터 - 고객: ${custSign.length}자, 공급자: ${comSign.length}자');
     String pdfUrl = _pdfFileUrl ?? '';
     try {
-      final pdfData = ContractPdfData(
-        comNo: _comNoController.text,
-        comName: _comNameController.text,
-        comTel: _comTelController.text,
-        comHp: _comHpController.text,
-        comCeoName: _comCeoNameController.text,
-        custComNo: _custComNoController.text,
-        custComName: _custComNameController.text,
-        custTel: _custTelController.text,
-        cuGongName: _cuGongNameController.text,
-        cuAddr1: _cuAddr1,
-        cuAddr2: _cuAddr2,
-        cuGongNo: _cuGongNo.isNotEmpty ? _cuGongNo : _contractNoController.text,
-        anzDate: _ensureDate(_anzDateController.text, DateUtil.today()),
-        anzDateF: _ensureDate(_anzDateFController.text, DateUtil.today()),
-        anzDateT: _ensureDate(_anzDateTController.text, DateUtil.afterDays(365)),
-        saleType: _saleType,
-        contType: _contType,
-        useCyl: _cylController.text,
-        useMeter: _meterController.text,
-        useTrans: _transController.text,
-        useVapor: _vaporController.text,
-        usePipe: _pipeController.text,
-        useFacility: _facilityController.text,
-        centerSi: _centerSiController.text,
-        centerConsumer: _centerConsumerController.text,
-        centerKgs: _centerKgsController.text,
-        centerGas: _centerGasController.text,
-        supplierSign: comSign.isNotEmpty ? comSign : null,
-        customerSign: custSign.isNotEmpty ? custSign : null,
-      );
+      final pdfData = _buildContractPdfData();
 
       final pdfBytes = await ContractPdfService.generate(pdfData);
+      debugPrint('[PDF] 생성 완료: ${pdfBytes.length} bytes');
       final filename = _generatePdfFilename();
 
       // ─── 2. PDF 서버 업로드 ───
@@ -262,10 +285,15 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       if (uploadResp['resultCode'] == 0 && uploadResp['resultData'] != null) {
         pdfUrl = uploadResp['resultData']['url'] ?? pdfUrl;
         _pdfFileUrl = pdfUrl;
+        Fluttertoast.showToast(msg: 'PDF 계약서 생성 완료');
+        debugPrint('[PDF] 업로드 완료: $pdfUrl');
+      } else {
+        Fluttertoast.showToast(msg: 'PDF 업로드 실패');
+        debugPrint('[PDF] 업로드 실패: $uploadResp');
       }
-    } catch (e) {
-      debugPrint('[PDF] 생성/업로드 실패: $e');
-      // PDF 실패해도 계약 저장은 계속 진행
+    } catch (e, st) {
+      debugPrint('[PDF] 생성/업로드 실패: $e\n$st');
+      Fluttertoast.showToast(msg: 'PDF 생성 실패: $e');
     }
 
     // ─── 3. 계약 데이터 저장 ───
@@ -959,6 +987,11 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
         children: [
+          SizedBox(
+            width: double.infinity,
+            child: _actionBtn('계약서 미리보기', const Color(0xFF1976D2), _previewPdf),
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(child: _actionBtn('점검 저장', const Color(0xFF555555), () async {
@@ -1035,5 +1068,134 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
     _centerSiController.dispose(); _centerConsumerController.dispose();
     _centerKgsController.dispose(); _centerGasController.dispose();
     super.dispose();
+  }
+}
+
+class _ContractPdfPreviewScreen extends StatefulWidget {
+  final Uint8List pdfBytes;
+
+  const _ContractPdfPreviewScreen({required this.pdfBytes});
+
+  @override
+  State<_ContractPdfPreviewScreen> createState() => _ContractPdfPreviewScreenState();
+}
+
+class _ContractPdfPreviewScreenState extends State<_ContractPdfPreviewScreen> {
+  List<Uint8List> _pageImages = [];
+  bool _isLoading = true;
+  double _scale = 1.0;
+  static const double _minScale = 1.0;
+  static const double _maxScale = 5.0;
+  static const double _scaleStep = 0.5;
+
+  @override
+  void initState() {
+    super.initState();
+    _rasterize();
+  }
+
+  Future<void> _rasterize() async {
+    final pages = <Uint8List>[];
+    await for (final page in Printing.raster(widget.pdfBytes, dpi: 150)) {
+      final png = await page.toPng();
+      pages.add(png);
+    }
+    if (mounted) {
+      setState(() {
+        _pageImages = pages;
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _zoomIn() {
+    setState(() {
+      _scale = (_scale + _scaleStep).clamp(_minScale, _maxScale);
+    });
+  }
+
+  void _zoomOut() {
+    setState(() {
+      _scale = (_scale - _scaleStep).clamp(_minScale, _maxScale);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('계약서 미리보기', style: TextStyle(fontSize: 16)),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print),
+            tooltip: '인쇄',
+            onPressed: () => Printing.layoutPdf(onLayout: (_) => widget.pdfBytes),
+          ),
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: '공유',
+            onPressed: () => Printing.sharePdf(bytes: widget.pdfBytes, filename: '계약서.pdf'),
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Stack(
+              children: [
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: SingleChildScrollView(
+                    child: SizedBox(
+                      width: MediaQuery.of(context).size.width * _scale,
+                      child: Column(
+                        children: [
+                          for (final img in _pageImages)
+                            Image.memory(img, fit: BoxFit.fitWidth),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                // +/- 확대축소 버튼
+                Positioned(
+                  right: 16,
+                  bottom: 32,
+                  child: Column(
+                    children: [
+                      _zoomButton(Icons.add, _scale < _maxScale, _zoomIn),
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black87,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text('${(_scale * 100).toInt()}%',
+                          style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
+                      const SizedBox(height: 4),
+                      _zoomButton(Icons.remove, _scale > _minScale, _zoomOut),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _zoomButton(IconData icon, bool enabled, VoidCallback onPressed) {
+    return Material(
+      elevation: 2,
+      shape: const CircleBorder(),
+      color: enabled ? Colors.white : Colors.grey.shade300,
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: enabled ? onPressed : null,
+        child: Padding(
+          padding: const EdgeInsets.all(10),
+          child: Icon(icon, size: 24, color: enabled ? Colors.black87 : Colors.grey),
+        ),
+      ),
+    );
   }
 }
