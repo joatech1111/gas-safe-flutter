@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -34,7 +35,19 @@ public class SmsController {
 	private static final String SEND_NO = "15662399";
 	private static final String DEFAULT_SUBJECT = "[조아테크]";
 
-	private final RestTemplate restTemplate = new RestTemplate();
+	private final RestTemplate restTemplate = buildRestTemplate();
+
+	private static RestTemplate buildRestTemplate() {
+		RestTemplate rt = new RestTemplate();
+		// upstream 4xx/5xx 응답을 예외 대신 그대로 반환받도록 처리
+		rt.setErrorHandler(new DefaultResponseErrorHandler() {
+			@Override
+			public boolean hasError(org.springframework.http.client.ClientHttpResponse response) {
+				return false;
+			}
+		});
+		return rt;
+	}
 
 	/*================================================================
 	 * Public Rest API
@@ -73,13 +86,17 @@ public class SmsController {
 
 		try {
 			ResponseEntity<String> response = restTemplate.postForEntity(uri, null, String.class);
-			logger.info("SMS sent to {} - status: {}", maskPhone(recvNo), response.getStatusCodeValue());
+			int upstreamStatus = response.getStatusCodeValue();
+			String upstreamBody = response.getBody();
+			logger.info("SMS sent to {} - upstream status: {}, body: {}",
+					maskPhone(recvNo), upstreamStatus, upstreamBody);
 
 			Map<String, Object> data = new HashMap<>();
-			data.put("upstreamStatus", response.getStatusCodeValue());
-			data.put("upstreamBody", response.getBody());
+			data.put("upstreamStatus", upstreamStatus);
+			data.put("upstreamBody", upstreamBody);
 
-			return new RestAPIResult("success", HttpStatus.OK.value(), toJson(data));
+			String result = (upstreamStatus >= 200 && upstreamStatus < 300) ? "success" : "fail";
+			return new RestAPIResult(result, upstreamStatus, toJson(data));
 		} catch (Exception e) {
 			logger.error("SMS send failed to {}: {}", maskPhone(recvNo), e.getMessage());
 			return new RestAPIResult("fail", HttpStatus.INTERNAL_SERVER_ERROR.value(),
