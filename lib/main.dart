@@ -29,11 +29,21 @@ class GasSafeApp extends StatelessWidget {
       ],
       theme: ThemeData(
         platform: TargetPlatform.android,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF4A90D9)),
+        scaffoldBackgroundColor: const Color(0xFFEDEAE7),
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFFDAD8D1),
+          surface: const Color(0xFFEDEAE7),
+        ),
         useMaterial3: true,
+        textTheme: const TextTheme(
+          bodyMedium: TextStyle(color: Color(0xFF4D4A47)),
+          bodyLarge: TextStyle(color: Color(0xFF4D4A47)),
+        ),
         appBarTheme: const AppBarTheme(
-          centerTitle: true,
-          elevation: 1,
+          centerTitle: false,
+          elevation: 0,
+          backgroundColor: Color(0xFFDAD8D1),
+          foregroundColor: Colors.black,
         ),
       ),
       home: const LoginScreen(),

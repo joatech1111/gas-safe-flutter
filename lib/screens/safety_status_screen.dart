@@ -124,14 +124,33 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
 
   Future<void> _searchByLocation() async {
     try {
-      final perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        await Geolocator.requestPermission();
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        Fluttertoast.showToast(msg: '위치 서비스를 활성화해주세요.');
+        return;
       }
-      final pos = await Geolocator.getCurrentPosition();
+
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.deniedForever) {
+        Fluttertoast.showToast(msg: '설정에서 위치 권한을 허용해주세요.');
+        await Geolocator.openAppSettings();
+        return;
+      }
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+        if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
+          Fluttertoast.showToast(msg: 'GPS 권한이 필요합니다.');
+          return;
+        }
+      }
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)),
+      );
       final req = _buildReqLocation();
-      req['GPS_X'] = pos.longitude.toString();
-      req['GPS_Y'] = pos.latitude.toString();
+      // Android와 동일: GPS_X = 위도(latitude), GPS_Y = 경도(longitude)
+      req['GPS_X'] = pos.latitude.toString();
+      req['GPS_Y'] = pos.longitude.toString();
 
       if (!mounted) return;
       final resp = await NetHelper.request(context, () => NetHelper.api.safetyStatusSearchLocation(req));
@@ -162,6 +181,10 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(13, 8, 13, 0),
+              child: CommonWidgets.buildSearchField(controller: _searchController, onSearch: _searchByKeyword, onGpsSearch: _searchByLocation),
+            ),
             _buildSearchPanel(),
             Expanded(child: _buildResultList()),
           ],
@@ -172,46 +195,35 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
 
   Widget _buildSearchPanel() {
     return Container(
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(4),
-        color: Colors.white,
-      ),
+      margin: const EdgeInsets.fromLTRB(20, 3, 20, 0),
       child: Column(
         children: [
           InkWell(
             onTap: () => setState(() => _isSearchExpanded = !_isSearchExpanded),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF555555),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(3),
-                  topRight: const Radius.circular(3),
-                  bottomLeft: Radius.circular(_isSearchExpanded ? 0 : 3),
-                  bottomRight: Radius.circular(_isSearchExpanded ? 0 : 3),
-                ),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 6),
               child: Row(
                 children: [
-                  const Text('검색조건', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
+                  const Text('검색조건', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppColors.textDefault)),
                   const Spacer(),
-                  Icon(_isSearchExpanded ? Icons.expand_less : Icons.expand_more, color: Colors.white),
+                  Icon(_isSearchExpanded ? Icons.expand_less : Icons.expand_more, color: AppColors.accent),
                 ],
               ),
             ),
           ),
           if (_isSearchExpanded)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.listStroke),
+                borderRadius: BorderRadius.circular(1.3),
+              ),
+              padding: const EdgeInsets.fromLTRB(7, 8.3, 7, 0),
               child: Column(
                 children: [
-                  const SizedBox(height: 4),
                   // Date range with ~ separator
                   Row(
                     children: [
-                      const SizedBox(width: 50, child: Text('기간', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                      const SizedBox(width: 50, child: Text('기간', style: TextStyle(fontSize: 12.7, fontWeight: FontWeight.w500, color: AppColors.textDefault))),
                       Expanded(
                         child: GestureDetector(
                           onTap: () async {
@@ -226,14 +238,22 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                             }
                           },
                           child: Container(
-                            height: AppInput.height, padding: const EdgeInsets.symmetric(horizontal: 8),
-                            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(AppInput.borderRadius)),
+                            height: 24, padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0xFFFFFFFF), Color(0xFFE5E4DD)],
+                              ),
+                              border: Border.all(color: AppColors.searchStroke, width: 1),
+                              borderRadius: BorderRadius.circular(0.3),
+                            ),
                             alignment: Alignment.center,
-                            child: Text(DateUtil.toDisplay(_dateFrom), style: const TextStyle(fontSize: AppInput.fontSize)),
+                            child: Text(DateUtil.toDisplay(_dateFrom), style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
                           ),
                         ),
                       ),
-                      const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('~', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold))),
+                      const Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('~', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textDefault))),
                       Expanded(
                         child: GestureDetector(
                           onTap: () async {
@@ -253,10 +273,18 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                             }
                           },
                           child: Container(
-                            height: AppInput.height, padding: const EdgeInsets.symmetric(horizontal: 8),
-                            decoration: BoxDecoration(border: Border.all(color: Colors.grey.shade400), borderRadius: BorderRadius.circular(AppInput.borderRadius)),
+                            height: 24, padding: const EdgeInsets.symmetric(horizontal: 8),
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [Color(0xFFFFFFFF), Color(0xFFE5E4DD)],
+                              ),
+                              border: Border.all(color: AppColors.searchStroke, width: 1),
+                              borderRadius: BorderRadius.circular(0.3),
+                            ),
                             alignment: Alignment.center,
-                            child: Text(DateUtil.toDisplay(_dateTo), style: const TextStyle(fontSize: AppInput.fontSize)),
+                            child: Text(DateUtil.toDisplay(_dateTo), style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
                           ),
                         ),
                       ),
@@ -265,7 +293,7 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const SizedBox(width: 80, child: Text('거래구분', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                      const SizedBox(width: 80, child: Text('거래구분', style: TextStyle(fontSize: 12.7, fontWeight: FontWeight.w500, color: AppColors.textDefault))),
                       _buildCuTypeRadio('전체', 0),
                       _buildCuTypeRadio('중량(6개월)', 1),
                       _buildCuTypeRadio('체적(1년)', 2),
@@ -306,7 +334,7 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                       const SizedBox(width: 8),
                       const SizedBox(
                         width: 80,
-                        child: Text('포함주소', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500)),
+                        child: Text('포함주소', style: TextStyle(fontSize: 12.7, fontWeight: FontWeight.w500, color: AppColors.textDefault)),
                       ),
                       Expanded(child: AppInput(controller: _includeAddressController, hint: '포함주소')),
                     ],
@@ -315,29 +343,51 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
                   Row(
                     children: [
                       Expanded(
-                        child: CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: const Text('부적합 거래처', style: TextStyle(fontSize: 13)),
-                          value: _showConformityOnly,
-                          onChanged: (v) => setState(() => _showConformityOnly = v ?? false),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: Checkbox(
+                                value: _showConformityOnly,
+                                onChanged: (v) => setState(() => _showConformityOnly = v ?? false),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () => setState(() => _showConformityOnly = !_showConformityOnly),
+                              child: const Text('부적합 거래처', style: TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
+                            ),
+                          ],
                         ),
                       ),
                       Expanded(
-                        child: CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: const Text('공급계약 거래처만 조회', style: TextStyle(fontSize: 13)),
-                          value: _showSuppOnly,
-                          onChanged: (v) => setState(() => _showSuppOnly = v ?? false),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: Checkbox(
+                                value: _showSuppOnly,
+                                onChanged: (v) => setState(() => _showSuppOnly = v ?? false),
+                                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            GestureDetector(
+                              onTap: () => setState(() => _showSuppOnly = !_showSuppOnly),
+                              child: const Text('공급계약 거래처만 조회', style: TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  CommonWidgets.buildSearchField(controller: _searchController, onSearch: _searchByKeyword, onGpsSearch: _searchByLocation),
                   const SizedBox(height: 8),
                 ],
               ),
@@ -353,94 +403,132 @@ class _SafetyStatusScreenState extends State<SafetyStatusScreen> {
       children: [
         Radio<int>(value: value, groupValue: _cuType, onChanged: (v) => setState(() => _cuType = v ?? 0),
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap, visualDensity: VisualDensity.compact),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textDefault)),
       ],
     );
+  }
+
+  Color _getBadgeColor(SafetyStatusResultData item) {
+    final cuType = (item.cuTypeName ?? '').trim();
+    if (cuType.contains('중량')) return AppColors.supplyWeight;
+    if (cuType.contains('체적')) return AppColors.supplyVolume;
+    return AppColors.textDefault;
+  }
+
+  Color _getDateColor(SafetyStatusResultData item) {
+    final result = (item.safeResultYN ?? '').trim();
+    if (result == 'N') return AppColors.dateOver;
+    final dateStr = item.anzDate ?? '';
+    if (dateStr.isEmpty) return AppColors.dateDefault;
+    try {
+      final anzDate = DateTime(
+        int.parse(dateStr.substring(0, 4)),
+        int.parse(dateStr.substring(4, 6)),
+        int.parse(dateStr.substring(6, 8)),
+      );
+      final now = DateTime.now();
+      final diff = anzDate.difference(now).inDays;
+      if (diff < 0) return AppColors.dateOver;
+      if (diff <= 30) return AppColors.dateSoon;
+    } catch (_) {}
+    return AppColors.dateDefault;
   }
 
   Widget _buildResultList() {
     if (_resultList.isEmpty) {
-      return const Center(child: Text('조회된 데이터가 없습니다.', style: TextStyle(color: Colors.grey)));
+      return const Center(child: Text('조회된 데이터가 없습니다.', style: TextStyle(color: AppColors.textDisabled)));
     }
-    return Column(
-      children: [
-        // Table header
-        Container(
-          color: const Color(0xFF666666),
-          child: Row(
-            children: [
-              _tableHeaderCell('거래구분', flex: 2),
-              _tableHeaderCell('점검구분', flex: 2),
-              _tableHeaderCell('고객명', flex: 3),
-              _tableHeaderCell('점검일', flex: 2),
-              _tableHeaderCell('적합', flex: 1),
-              _tableHeaderCell('서명', flex: 1),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView.builder(
-            itemCount: _resultList.length,
-            itemBuilder: (context, index) {
-              final item = _resultList[index];
-              return Container(
-                decoration: BoxDecoration(
-                  border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
-                ),
-                child: Row(
-                  children: [
-                    _tableDataCell(item.cuTypeName ?? '', flex: 2),
-                    _tableDataCell(item.safeName ?? '', flex: 2),
-                    _tableDataCell(item.anzCustName ?? '', flex: 3),
-                    _tableDataCell(DateUtil.convertFormat(item.anzDate ?? '', DateUtil.formatYyyymmdd, DateUtil.formatYyMmDd), flex: 2),
-                    _tableDataCellColored(item.safeResultYN ?? '', flex: 1,
-                        color: item.safeResultYN == 'Y' ? Colors.green : Colors.red),
-                    _tableDataCell(item.anzSignYN ?? '', flex: 1),
-                  ],
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _tableHeaderCell(String text, {int flex = 1}) {
-    return Expanded(
-      flex: flex,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        decoration: BoxDecoration(
-          border: Border(right: BorderSide(color: Colors.grey.shade500, width: 0.5)),
-        ),
-        child: Text(text, style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(13, 8.3, 13, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.listStroke, width: 1),
+        borderRadius: BorderRadius.circular(1.3),
       ),
-    );
-  }
-
-  Widget _tableDataCell(String text, {int flex = 1}) {
-    return Expanded(
-      flex: flex,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        decoration: BoxDecoration(
-          border: Border(right: BorderSide(color: Colors.grey.shade300, width: 0.5)),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(1.3),
+        child: ListView.builder(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+          itemCount: _resultList.length,
+          itemBuilder: (context, index) {
+            final item = _resultList[index];
+            final badgeColor = _getBadgeColor(item);
+            final dateColor = _getDateColor(item);
+            final displayDate = DateUtil.convertFormat(item.anzDate ?? '', DateUtil.formatYyyymmdd, DateUtil.formatYyMmDd);
+            return Container(
+              padding: const EdgeInsets.symmetric(vertical: 11),
+              decoration: BoxDecoration(
+                border: index < _resultList.length - 1
+                    ? const Border(bottom: BorderSide(color: AppColors.listStroke, width: 0.5))
+                    : null,
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      // Badge
+                      Container(
+                        width: 27,
+                        height: 19,
+                        alignment: Alignment.center,
+                        decoration: BoxDecoration(
+                          color: badgeColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                        child: Text(
+                          (item.cuTypeName ?? '').length > 2
+                              ? (item.cuTypeName ?? '').substring(0, 2)
+                              : item.cuTypeName ?? '',
+                          style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      // Customer name
+                      Expanded(
+                        child: Text(
+                          item.anzCustName ?? '',
+                          style: const TextStyle(fontSize: 20, color: AppColors.textDefault, fontWeight: FontWeight.w500),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // Safe result
+                      Text(
+                        item.safeResultYN == 'Y' ? '적합' : '부적합',
+                        style: TextStyle(
+                          fontSize: 12.7,
+                          color: item.safeResultYN == 'Y' ? AppColors.dateSoon : AppColors.dateOver,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  // Check type + worker name
+                  Text(
+                    '${item.safeName ?? ''}  ${item.anzSwName ?? ''}',
+                    style: const TextStyle(fontSize: 20, color: AppColors.textDefault),
+                  ),
+                  const SizedBox(height: 2),
+                  // Date row
+                  Row(
+                    children: [
+                      Text(
+                        '점검일: $displayDate',
+                        style: TextStyle(fontSize: 12.7, color: dateColor),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '서명: ${item.anzSignYN ?? ''}',
+                        style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            );
+          },
         ),
-        child: Text(text, style: const TextStyle(fontSize: 11), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
-      ),
-    );
-  }
-
-  Widget _tableDataCellColored(String text, {int flex = 1, Color color = Colors.black}) {
-    return Expanded(
-      flex: flex,
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-        decoration: BoxDecoration(
-          border: Border(right: BorderSide(color: Colors.grey.shade300, width: 0.5)),
-        ),
-        child: Text(text, style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
       ),
     );
   }

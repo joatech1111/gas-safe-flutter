@@ -391,8 +391,9 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
       'ANZ_GongNo': _anzGongNoController.text,
       'ANZ_GongName': _anzGongNameController.text,
       'ANZ_Sign_YN': hasSign ? 'Y' : 'N',
-      'GPS_X': pos?.longitude.toString() ?? '',
-      'GPS_Y': pos?.latitude.toString() ?? '',
+      // Android와 동일: GPS_X = 위도(latitude), GPS_Y = 경도(longitude)
+      'GPS_X': pos?.latitude.toString() ?? '',
+      'GPS_Y': pos?.longitude.toString() ?? '',
       'APP_User': AppState.loginUserId,
       'ANZ_Sign': hasSign ? _signatureData! : '',
     };

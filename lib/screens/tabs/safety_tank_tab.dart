@@ -210,8 +210,9 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
       'ANZ_CU_Confirm': _anzCustNameController.text,
       'ANZ_CU_Confirm_TEL': _anzCuConfirmTelController.text,
       'ANZ_CU_SMS_YN': sendSMS ? 'Y' : 'N',
-      'GPS_X': pos?.longitude.toString() ?? '',
-      'GPS_Y': pos?.latitude.toString() ?? '',
+      // Android와 동일: GPS_X = 위도(latitude), GPS_Y = 경도(longitude)
+      'GPS_X': pos?.latitude.toString() ?? '',
+      'GPS_Y': pos?.longitude.toString() ?? '',
       'ANZ_User_ID': AppState.loginUserId,
       'ANZ_Sign': signBase64,
     };
@@ -356,7 +357,7 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
           width: double.infinity,
           padding: const EdgeInsets.symmetric(vertical: 8),
           color: Colors.grey.shade100,
-          child: const Text('저장탱크', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
+          child: const Text('안전관리 실시대장', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
         ),
         Expanded(
           child: SingleChildScrollView(

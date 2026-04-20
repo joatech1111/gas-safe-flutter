@@ -342,8 +342,9 @@ class _SafetyContractTabState extends State<SafetyContractTab> with AutomaticKee
       'REG_DT': '', 'REG_USER_ID': AppState.loginUserId,
       'REG_SW_CODE': AppState.safeSwCode, 'REG_SW_NAME': AppState.safeSwName,
       'USERNO': '',
-      'GPS_X': pos?.longitude.toString() ?? '',
-      'GPS_Y': pos?.latitude.toString() ?? '',
+      // Android와 동일: GPS_X = 위도(latitude), GPS_Y = 경도(longitude)
+      'GPS_X': pos?.latitude.toString() ?? '',
+      'GPS_Y': pos?.longitude.toString() ?? '',
       'ANZ_Sign': custSign,
       'ANZ_Sign_C': comSign,
       'REG_TYPE': '',

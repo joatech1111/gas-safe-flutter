@@ -377,8 +377,9 @@ class _SafetySavingTabState extends State<SafetySavingTab> with AutomaticKeepAli
       'ANZ_CU_Confirm_TEL': _anzCuConfirmTelController.text,
       'ANZ_Sign_YN': _hasSignature ? Keys.y : Keys.n,
       'ANZ_CU_SMS_YN': sendSMS ? Keys.y : Keys.n,
-      'GPS_X': pos?.longitude.toString() ?? '',
-      'GPS_Y': pos?.latitude.toString() ?? '',
+      // Android와 동일: GPS_X = 위도(latitude), GPS_Y = 경도(longitude)
+      'GPS_X': pos?.latitude.toString() ?? '',
+      'GPS_Y': pos?.longitude.toString() ?? '',
       'ANZ_User_ID': AppState.loginUserId,
       'ANZ_Sign': _signatureData ?? '',
     };

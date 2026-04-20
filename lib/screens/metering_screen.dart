@@ -139,19 +139,34 @@ class _MeteringScreenState extends State<MeteringScreen> {
 
   Future<void> _searchByLocation() async {
     try {
-      final perm = await Geolocator.checkPermission();
-      if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
-        final req = await Geolocator.requestPermission();
-        if (req == LocationPermission.denied || req == LocationPermission.deniedForever) {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        Fluttertoast.showToast(msg: '위치 서비스를 활성화해주세요.');
+        return;
+      }
+
+      var perm = await Geolocator.checkPermission();
+      if (perm == LocationPermission.deniedForever) {
+        Fluttertoast.showToast(msg: '설정에서 위치 권한을 허용해주세요.');
+        await Geolocator.openAppSettings();
+        return;
+      }
+      if (perm == LocationPermission.denied) {
+        perm = await Geolocator.requestPermission();
+        if (perm == LocationPermission.denied || perm == LocationPermission.deniedForever) {
           Fluttertoast.showToast(msg: 'GPS 권한이 필요합니다.');
           return;
         }
       }
-      final pos = await Geolocator.getCurrentPosition();
+
+      final pos = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(accuracy: LocationAccuracy.high, timeLimit: Duration(seconds: 10)),
+      );
+      // Android와 동일: GPS_X = 위도(latitude), GPS_Y = 경도(longitude)
       final req = _buildReq(
         forLocation: true,
-        gpsX: pos.longitude.toString(),
-        gpsY: pos.latitude.toString(),
+        gpsX: pos.latitude.toString(),
+        gpsY: pos.longitude.toString(),
       );
 
       if (!mounted) return;
@@ -186,6 +201,10 @@ class _MeteringScreenState extends State<MeteringScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(13, 8, 13, 0),
+              child: CommonWidgets.buildSearchField(controller: _searchController, onSearch: _searchByKeyword, onGpsSearch: _searchByLocation),
+            ),
             _buildSearchPanel(),
             Expanded(child: _buildResultList()),
           ],
@@ -196,72 +215,63 @@ class _MeteringScreenState extends State<MeteringScreen> {
 
   Widget _buildSearchPanel() {
     return Container(
-      margin: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        border: Border.all(color: Colors.grey.shade400),
-        borderRadius: BorderRadius.circular(4),
-        color: Colors.white,
-      ),
+      margin: const EdgeInsets.fromLTRB(20, 3, 20, 0),
       child: Column(
         children: [
           InkWell(
             onTap: () => setState(() => _isSearchExpanded = !_isSearchExpanded),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF555555),
-                borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(3),
-                  topRight: const Radius.circular(3),
-                  bottomLeft: Radius.circular(_isSearchExpanded ? 0 : 3),
-                  bottomRight: Radius.circular(_isSearchExpanded ? 0 : 3),
+            child: Row(
+              children: [
+                Expanded(
+                  child: CommonWidgets.buildDateField(
+                    context: context,
+                    label: '검침일자',
+                    value: _gumDate,
+                    onChanged: (v) => setState(() => _gumDate = v),
+                  ),
                 ),
-              ),
-              child: Row(
-                children: [
-                  const Text('검색조건', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Colors.white)),
-                  const Spacer(),
-                  Icon(_isSearchExpanded ? Icons.expand_less : Icons.expand_more, color: Colors.white),
-                ],
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: Checkbox(
+                          value: _showUnmeteringOnly,
+                          onChanged: (v) => setState(() => _showUnmeteringOnly = v ?? false),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Text('미검침 세대만 보기', style: TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
+                    ],
+                  ),
+                ),
+                const Spacer(),
+                SizedBox(
+                  width: 30,
+                  height: 30,
+                  child: Icon(_isSearchExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down, size: 24, color: AppColors.textDefault),
+                ),
+              ],
             ),
           ),
           if (_isSearchExpanded)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            Container(
+              decoration: BoxDecoration(
+                border: Border.all(color: AppColors.listStroke),
+                borderRadius: BorderRadius.circular(1.3),
+              ),
+              padding: const EdgeInsets.fromLTRB(7, 8.3, 7, 0),
               child: Column(
                 children: [
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Expanded(
-                        flex: 3,
-                        child: CommonWidgets.buildDateField(
-                          context: context,
-                          label: '검침일자',
-                          value: _gumDate,
-                          onChanged: (v) => setState(() => _gumDate = v),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        flex: 2,
-                        child: CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: const Text('미검침 세대만 보기', style: TextStyle(fontSize: 12)),
-                          value: _showUnmeteringOnly,
-                          onChanged: (v) => setState(() => _showUnmeteringOnly = v ?? false),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 6),
                   // Cycle type radio
                   Row(
                     children: [
-                      const SizedBox(width: 80, child: Text('검침주기', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                      const SizedBox(width: 80, child: Text('검침주기', style: TextStyle(fontSize: 12.7, fontWeight: FontWeight.w500, color: AppColors.textDefault))),
                       _buildRadio('전체', 0),
                       _buildRadio('회차별', 1),
                       _buildRadio('주기별', 2),
@@ -271,7 +281,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const SizedBox(width: 80, child: Text('회차', style: TextStyle(fontSize: 13))),
+                        const SizedBox(width: 80, child: Text('회차', style: TextStyle(fontSize: 12.7, color: AppColors.textDefault))),
                         SizedBox(
                           width: 90,
                           child: TextField(
@@ -283,7 +293,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
                               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                               hintText: '회차',
                             ),
-                            style: const TextStyle(fontSize: 13),
+                            style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault),
                           ),
                         ),
                       ],
@@ -302,7 +312,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
                     const SizedBox(height: 6),
                     Row(
                       children: [
-                        const SizedBox(width: 80, child: Text('일', style: TextStyle(fontSize: 13))),
+                        const SizedBox(width: 80, child: Text('일', style: TextStyle(fontSize: 12.7, color: AppColors.textDefault))),
                         SizedBox(
                           width: 90,
                           child: TextField(
@@ -314,7 +324,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
                               contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                               hintText: '일',
                             ),
-                            style: const TextStyle(fontSize: 13),
+                            style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault),
                           ),
                         ),
                       ],
@@ -338,7 +348,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      const SizedBox(width: 80, child: Text('포함주소', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+                      const SizedBox(width: 80, child: Text('포함주소', style: TextStyle(fontSize: 12.7, fontWeight: FontWeight.w500, color: AppColors.textDefault))),
                       Expanded(
                         child: TextField(
                           controller: _includeAddressController,
@@ -348,7 +358,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
                             contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                             hintText: '포함주소',
                           ),
-                          style: const TextStyle(fontSize: 13),
+                          style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault),
                         ),
                       ),
                     ],
@@ -357,20 +367,25 @@ class _MeteringScreenState extends State<MeteringScreen> {
                   Row(
                     children: [
                       const SizedBox(width: 80),
-                      Expanded(
-                        child: CheckboxListTile(
-                          dense: true,
-                          contentPadding: EdgeInsets.zero,
-                          controlAffinity: ListTileControlAffinity.leading,
-                          title: const Text('원격검침 거래처 제외', style: TextStyle(fontSize: 12)),
-                          value: _excludeRemoteMetering,
-                          onChanged: (v) => setState(() => _excludeRemoteMetering = v ?? false),
-                        ),
+                      Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: Checkbox(
+                              value: _excludeRemoteMetering,
+                              onChanged: (v) => setState(() => _excludeRemoteMetering = v ?? false),
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              visualDensity: VisualDensity.compact,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Text('원격검침 거래처 제외', style: TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
+                        ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  CommonWidgets.buildSearchField(controller: _searchController, onSearch: _searchByKeyword, onGpsSearch: _searchByLocation),
                   const SizedBox(height: 8),
                 ],
               ),
@@ -391,19 +406,30 @@ class _MeteringScreenState extends State<MeteringScreen> {
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           visualDensity: VisualDensity.compact,
         ),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        Text(label, style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
       ],
     );
   }
 
   Widget _buildResultList() {
     if (_resultList.isEmpty) {
-      return const Center(child: Text('조회된 데이터가 없습니다.', style: TextStyle(color: Colors.grey)));
+      return const Center(child: Text('조회된 데이터가 없습니다.', style: TextStyle(color: AppColors.textDisabled)));
     }
 
-    return ListView.builder(
-      itemCount: _resultList.length,
-      itemBuilder: (context, index) => _buildMeteringItem(_resultList[index], index),
+    return Container(
+      margin: const EdgeInsets.fromLTRB(13, 8.3, 13, 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: AppColors.listStroke, width: 1),
+        borderRadius: BorderRadius.circular(1.3),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(1.3),
+        child: ListView.builder(
+          itemCount: _resultList.length,
+          itemBuilder: (context, index) => _buildMeteringItem(_resultList[index], index),
+        ),
+      ),
     );
   }
 
@@ -414,7 +440,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: Colors.grey.shade300)),
+          border: Border(bottom: BorderSide(color: AppColors.listStroke.withValues(alpha: 0.4))),
           color: Colors.white,
         ),
         child: Column(
@@ -426,13 +452,13 @@ class _MeteringScreenState extends State<MeteringScreen> {
                 Expanded(
                   child: Text(
                     item.cuNameView ?? item.cuName ?? '',
-                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textDefault),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
-                Text(item.cuTel ?? '', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                Text(item.cuTel ?? '', style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
                 const SizedBox(width: 8),
-                Text('지침: ${item.gjGum ?? ''}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                Text('지침: ${item.gjGum ?? ''}', style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
               ],
             ),
             const SizedBox(height: 3),
@@ -441,22 +467,16 @@ class _MeteringScreenState extends State<MeteringScreen> {
               children: [
                 Expanded(
                   child: Text('${item.cuAddr1 ?? ''} ${item.cuAddr2 ?? ''}',
-                      style: const TextStyle(fontSize: 11, color: Colors.black54),
+                      style: const TextStyle(fontSize: 11, color: AppColors.textDisabled),
                       overflow: TextOverflow.ellipsis),
                 ),
-                Text('전검침: ${DateUtil.toDisplay(item.gjDate ?? '')}', style: const TextStyle(fontSize: 11, color: Colors.black45)),
+                Text('전검침: ${DateUtil.toDisplay(item.gjDate ?? '')}', style: const TextStyle(fontSize: 11, color: AppColors.textDisabled)),
               ],
             ),
             if (item.appGjDate != null && item.appGjDate!.isNotEmpty) ...[
               const SizedBox(height: 3),
-              Row(
-                children: [
-                  const Icon(Icons.check_circle, size: 14, color: Colors.green),
-                  const SizedBox(width: 4),
-                  Text('검침완료: ${DateUtil.toDisplay(item.appGjDate!)}  지침: ${item.appGjGum ?? ''}',
-                      style: const TextStyle(fontSize: 11, color: Colors.green)),
-                ],
-              ),
+              Text('검침완료: ${DateUtil.toDisplay(item.appGjDate!)}  지침: ${item.appGjGum ?? ''}',
+                  style: const TextStyle(fontSize: 11, color: Colors.green)),
             ],
           ],
         ),
@@ -474,14 +494,14 @@ class _MeteringScreenState extends State<MeteringScreen> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.all(12),
-              color: Colors.grey.shade200,
+              color: AppColors.primaryDark,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(item.cuNameView ?? item.cuName ?? '', style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 2),
-                  Text(item.cuTel ?? '', style: const TextStyle(fontSize: 12, color: Colors.black54)),
-                  Text(item.cuAddr ?? '${item.cuAddr1 ?? ''} ${item.cuAddr2 ?? ''}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                  Text(item.cuTel ?? '', style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
+                  Text(item.cuAddr ?? '${item.cuAddr1 ?? ''} ${item.cuAddr2 ?? ''}', style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
                 ],
               ),
             ),
@@ -924,7 +944,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
         Expanded(child: Text(value, textAlign: TextAlign.right, style: const TextStyle(fontSize: 17))),
         if (unit.isNotEmpty) ...[
           const SizedBox(width: 4),
-          Text(unit, style: const TextStyle(fontSize: 15, color: Colors.black54)),
+          Text(unit, style: const TextStyle(fontSize: 15, color: AppColors.textDefault)),
         ],
       ],
     );
@@ -963,7 +983,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
           ),
           if (unit.isNotEmpty) ...[
             const SizedBox(width: 4),
-            SizedBox(width: 24, child: Text(unit, style: const TextStyle(fontSize: 15, color: Colors.black54))),
+            SizedBox(width: 24, child: Text(unit, style: const TextStyle(fontSize: 15, color: AppColors.textDefault))),
           ],
         ],
       ),
@@ -1021,8 +1041,9 @@ class _MeteringScreenState extends State<MeteringScreen> {
       'GJ_BIGO': bigo,
       'SAFE_SW_CODE': AppState.safeSwCode,
       'SAFE_SW_NAME': AppState.safeSwName,
-      'GPS_X': pos?.longitude.toString() ?? '',
-      'GPS_Y': pos?.latitude.toString() ?? '',
+      // Android와 동일: GPS_X = 위도(latitude), GPS_Y = 경도(longitude)
+      'GPS_X': pos?.latitude.toString() ?? '',
+      'GPS_Y': pos?.longitude.toString() ?? '',
       'APP_User': AppState.loginUserId,
     };
 

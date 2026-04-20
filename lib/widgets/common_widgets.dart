@@ -1,8 +1,35 @@
 import 'package:flutter/material.dart';
 import '../models/combo_data.dart';
 
-/// 앱 전체 공통 입력 필드 컴포넌트
-/// 높이 48px, fontSize 14, borderRadius 4, grey.shade400 border
+/// 기존 Android 앱과 동일한 색상 팔레트
+class AppColors {
+  AppColors._();
+  static const Color primary       = Color(0xFFEDEAE7); // window_background
+  static const Color primaryDark   = Color(0xFFDAD8D1); // menu/header background
+  static const Color accent        = Color(0xFF707070);
+  static const Color textDefault   = Color(0xFF4D4A47); // 기본 텍스트
+  static const Color textDisabled  = Color(0xFFA6A19D);
+  static const Color editBg        = Color(0xFFF9FBFD); // edittext_background
+  static const Color editStroke    = Color(0xFF707070); // edittext_stroke
+  static const Color editHint      = Color(0xFFA7A7A7);
+  static const Color searchStroke  = Color(0xFFB2B2B2); // box_search_stroke
+  static const Color listBg        = Color(0xFFFFFFFF);
+  static const Color listStroke    = Color(0xFFA0A0A0);
+  static const Color buttonBg      = Color(0xFFBEBCB6); // button_background_2 / footer
+  static const Color buttonStroke  = Color(0xFF838282);
+  static const Color lineBg        = Color(0xFFAAAAAA);
+
+  // 의미 색상
+  static const Color supplyWeight  = Color(0xFF00079C); // 중량
+  static const Color supplyVolume  = Color(0xFF9B0000); // 체적
+  static const Color dateDefault   = Color(0xFFB1B1B1);
+  static const Color dateSoon      = Color(0xFF0056F3); // 임박
+  static const Color dateOver      = Color(0xFFCF0000); // 초과
+  static const Color meteringDef   = Color(0xFFF47A01); // 검침 기본
+}
+
+/// 앱 전체 공통 입력 필드 컴포넌트 (Android 스타일)
+/// 높이 29dp, fontSize 14.7, borderRadius 1.3, #f9fbfd bg
 class AppInput extends StatelessWidget {
   final TextEditingController controller;
   final String? hint;
@@ -29,9 +56,9 @@ class AppInput extends StatelessWidget {
     this.maxLines = 1,
   });
 
-  static const double height = 25;
+  static const double height = 29;
   static const double fontSize = 14;
-  static const double borderRadius = 4;
+  static const double borderRadius = 1.3;
 
   static InputDecoration decoration({
     String? hint,
@@ -40,19 +67,25 @@ class AppInput extends StatelessWidget {
   }) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(fontSize: fontSize, color: Colors.grey.shade400),
+      hintStyle: const TextStyle(fontSize: fontSize, color: AppColors.editHint),
       suffixText: suffixText,
-      suffixStyle: const TextStyle(fontSize: 13, color: Colors.black54),
+      suffixStyle: const TextStyle(fontSize: 13, color: AppColors.textDefault),
       suffixIcon: suffixIcon,
+      filled: true,
+      fillColor: AppColors.editBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(borderRadius),
-        borderSide: BorderSide(color: Colors.grey.shade400),
+        borderSide: const BorderSide(color: AppColors.editStroke, width: 1),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(borderRadius),
-        borderSide: BorderSide(color: Colors.grey.shade400),
+        borderSide: const BorderSide(color: AppColors.editStroke, width: 1),
       ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(borderRadius),
+        borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+      ),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
     );
   }
 
@@ -69,7 +102,7 @@ class AppInput extends StatelessWidget {
         onSubmitted: onSubmitted,
         maxLines: maxLines,
         decoration: decoration(hint: hint, suffixText: suffixText, suffixIcon: suffixIcon),
-        style: const TextStyle(fontSize: fontSize),
+        style: const TextStyle(fontSize: fontSize, color: AppColors.textDefault),
       ),
     );
   }
@@ -91,14 +124,19 @@ class CommonWidgets {
 
     return Row(
       children: [
-        SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+        SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 12.7, fontWeight: FontWeight.w500, color: AppColors.textDefault))),
         Expanded(
           child: Container(
-            height: AppInput.height,
-            padding: const EdgeInsets.symmetric(horizontal: 8),
+            height: 24,
+            padding: const EdgeInsets.symmetric(horizontal: 7),
             decoration: BoxDecoration(
-              border: Border.all(color: Colors.grey.shade400),
-              borderRadius: BorderRadius.circular(AppInput.borderRadius),
+              gradient: const LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFFFFFFF), Color(0xFFE5E4DD)],
+              ),
+              border: Border.all(color: AppColors.searchStroke, width: 1),
+              borderRadius: BorderRadius.circular(0.3),
             ),
             child: DropdownButtonHideUnderline(
               child: DropdownButton<ComboData>(
@@ -107,9 +145,10 @@ class CommonWidgets {
                 value: _findMatchingItem(allItems, selectedItem),
                 items: allItems.map((e) => DropdownMenuItem(
                   value: e,
-                  child: Text(e.getCdName(), style: const TextStyle(fontSize: 13), overflow: TextOverflow.ellipsis),
+                  child: Text(e.getCdName(), style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault), overflow: TextOverflow.ellipsis),
                 )).toList(),
                 onChanged: onChanged,
+                icon: const Icon(Icons.arrow_drop_down, size: 18, color: AppColors.accent),
               ),
             ),
           ),
@@ -126,38 +165,68 @@ class CommonWidgets {
     return items.isNotEmpty ? items.first : null;
   }
 
+  /// Android와 동일한 검색 바: 36dp EditText + 54x36 검색버튼 + 36x36 GPS버튼
   static Widget buildSearchField({
     required TextEditingController controller,
     required VoidCallback onSearch,
     VoidCallback? onGpsSearch,
     String hint = '검색어를 입력하세요',
   }) {
+    const double barH = 36;
     return Row(
       children: [
         Expanded(
-          child: AppInput(
-            controller: controller,
-            hint: hint,
-            onSubmitted: (_) => onSearch(),
-          ),
-        ),
-        const SizedBox(width: 6),
-        GestureDetector(
-          onTap: onSearch,
-          child: Container(
-            width: 48, height: AppInput.height,
-            decoration: BoxDecoration(color: const Color(0xFF555555), borderRadius: BorderRadius.circular(AppInput.borderRadius)),
-            child: const Icon(Icons.search, size: 20, color: Colors.white),
+          child: SizedBox(
+            height: barH,
+            child: TextField(
+              controller: controller,
+              onSubmitted: (_) => onSearch(),
+              style: const TextStyle(fontSize: 18, color: AppColors.textDefault),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: const TextStyle(fontSize: 14, color: AppColors.editHint),
+                filled: true,
+                fillColor: AppColors.editBg,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(AppInput.borderRadius), borderSide: const BorderSide(color: AppColors.searchStroke)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppInput.borderRadius), borderSide: const BorderSide(color: AppColors.searchStroke)),
+                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(AppInput.borderRadius), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+                suffixIcon: GestureDetector(
+                  onTap: onSearch,
+                  child: Container(
+                    width: 54,
+                    height: barH,
+                    alignment: Alignment.center,
+                    child: Image.asset('assets/images/search2.png', width: 24, height: 24,
+                      errorBuilder: (_, __, ___) => const Icon(Icons.search, size: 22, color: AppColors.accent),
+                    ),
+                  ),
+                ),
+                suffixIconConstraints: const BoxConstraints(maxWidth: 54, maxHeight: barH),
+              ),
+            ),
           ),
         ),
         if (onGpsSearch != null) ...[
-          const SizedBox(width: 6),
+          const SizedBox(width: 5),
           GestureDetector(
             onTap: onGpsSearch,
             child: Container(
-              width: 48, height: AppInput.height,
-              decoration: BoxDecoration(color: const Color(0xFF4A90D9), borderRadius: BorderRadius.circular(AppInput.borderRadius)),
-              child: const Icon(Icons.gps_fixed, size: 20, color: Colors.white),
+              width: 36,
+              height: barH,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(AppInput.borderRadius),
+              ),
+              child: Image.asset('assets/images/location.png', width: 36, height: 36,
+                errorBuilder: (_, __, ___) => Container(
+                  width: 36, height: barH,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A90D9),
+                    borderRadius: BorderRadius.circular(AppInput.borderRadius),
+                  ),
+                  child: const Icon(Icons.gps_fixed, size: 20, color: Colors.white),
+                ),
+              ),
             ),
           ),
         ],
@@ -173,7 +242,7 @@ class CommonWidgets {
   }) {
     return Row(
       children: [
-        SizedBox(width: 60, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+        SizedBox(width: 60, child: Text(label, style: const TextStyle(fontSize: 12.7, fontWeight: FontWeight.w500, color: AppColors.textDefault))),
         Expanded(
           child: GestureDetector(
             onTap: () async {
@@ -190,15 +259,16 @@ class CommonWidgets {
             },
             child: Container(
               height: AppInput.height,
-              padding: const EdgeInsets.symmetric(horizontal: 10),
+              padding: const EdgeInsets.symmetric(horizontal: 7),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.grey.shade400),
+                color: AppColors.editBg,
+                border: Border.all(color: AppColors.editStroke),
                 borderRadius: BorderRadius.circular(AppInput.borderRadius),
               ),
               alignment: Alignment.centerLeft,
               child: Text(
                 _displayDate(value),
-                style: const TextStyle(fontSize: AppInput.fontSize),
+                style: const TextStyle(fontSize: AppInput.fontSize, color: AppColors.textDefault),
               ),
             ),
           ),
@@ -270,13 +340,15 @@ class CommonWidgets {
     return '${yyyymmdd.substring(0, 4)}-${yyyymmdd.substring(4, 6)}-${yyyymmdd.substring(6, 8)}';
   }
 
+  /// Android 스타일 AppBar: #DAD8D1 배경, 검은색 텍스트, 좌측 정렬
   static AppBar buildAppBar(BuildContext context, String title, {List<Widget>? actions, VoidCallback? onLogout}) {
     final canGoBack = Navigator.of(context).canPop();
     return AppBar(
-      title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.black)),
-      backgroundColor: Colors.white,
+      title: Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black)),
+      centerTitle: false,
+      backgroundColor: AppColors.primaryDark,
       foregroundColor: Colors.black,
-      elevation: 1,
+      elevation: 0,
       leading: canGoBack
           ? IconButton(
               icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 22),
@@ -286,7 +358,9 @@ class CommonWidgets {
               onTap: () => Navigator.of(context).popUntil((route) => route.isFirst),
               child: Padding(
                 padding: const EdgeInsets.all(12),
-                child: Image.asset('assets/images/home.png', width: 24, height: 24),
+                child: Image.asset('assets/images/home.png', width: 24, height: 24,
+                  errorBuilder: (_, __, ___) => const Icon(Icons.home, size: 24, color: Colors.black87),
+                ),
               ),
             ),
       actions: [
@@ -295,7 +369,9 @@ class CommonWidgets {
             onTap: onLogout,
             child: Padding(
               padding: const EdgeInsets.all(12),
-              child: Image.asset('assets/images/logout.png', width: 22, height: 22),
+              child: Image.asset('assets/images/logout.png', width: 22, height: 22,
+                errorBuilder: (_, __, ___) => const Icon(Icons.logout, size: 22, color: Colors.black87),
+              ),
             ),
           ),
         ...?actions,
@@ -303,6 +379,7 @@ class CommonWidgets {
     );
   }
 
+  /// Android 스타일 하단 상태바: #DAD8D1 배경
   static Widget buildBottomStatusBar({
     required String workerName,
     String? rightText,
@@ -316,17 +393,17 @@ class CommonWidgets {
       minimum: const EdgeInsets.only(bottom: 2),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-        decoration: BoxDecoration(
-          color: Colors.grey.shade300,
-          border: Border(top: BorderSide(color: Colors.grey.shade500, width: 0.6)),
+        height: 37,
+        padding: const EdgeInsets.symmetric(horizontal: 20),
+        decoration: const BoxDecoration(
+          color: AppColors.primaryDark,
         ),
         child: Row(
           children: [
-            Text('검침원 : $name', style: const TextStyle(fontSize: 12, color: Colors.black87)),
+            Text('검침원 : $name', style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
             const Spacer(),
             if (rightText != null && rightText.trim().isNotEmpty)
-              Text(rightText, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+              Text(rightText, style: const TextStyle(fontSize: 12.7, color: AppColors.textDefault)),
           ],
         ),
       ),
