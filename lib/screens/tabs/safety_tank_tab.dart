@@ -207,6 +207,7 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
       'ANZ_TANK_SW_Bigo2': _bigo2Controller.text,
       'ANZ_CustName': _anzCustNameController.text,
       'ANZ_Sign_YN': signYN,
+      'ANZ_CU_Confirm': _anzCustNameController.text,
       'ANZ_CU_Confirm_TEL': _anzCuConfirmTelController.text,
       'ANZ_CU_SMS_YN': sendSMS ? 'Y' : 'N',
       'GPS_X': pos?.longitude.toString() ?? '',

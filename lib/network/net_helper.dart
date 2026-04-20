@@ -55,6 +55,7 @@ class NetHelper {
   static void handleError(BuildContext context, Map<String, dynamic> resp) {
     final resultCode = resp['resultCode'] ?? -1;
     final resultMsg = resp['result']?.toString() ?? '';
+    debugPrint('▶ handleError: resultCode=$resultCode, result=$resultMsg, full=$resp');
     switch (resultCode) {
       case 9999:
         Fluttertoast.showToast(msg: resultMsg.isNotEmpty ? resultMsg : '알 수 없는 에러가 발생했습니다.');
@@ -71,6 +72,13 @@ class NetHelper {
       case 112:
         Fluttertoast.showToast(msg: '알 수 없는 에러가 발생했습니다.');
         _goLogin(context);
+        break;
+      default:
+        Fluttertoast.showToast(
+          msg: resultMsg.isNotEmpty
+              ? '오류($resultCode): $resultMsg'
+              : '알 수 없는 에러가 발생했습니다. (코드: $resultCode)',
+        );
         break;
     }
   }

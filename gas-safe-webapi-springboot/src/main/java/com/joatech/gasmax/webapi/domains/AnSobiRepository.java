@@ -244,7 +244,7 @@ public class AnSobiRepository extends GasMaxRepository{
 													String anzNa, String anzDa, String anzRa, String anzMa, String anzBa, String anzSa, String anzAa, String anzJa, String anzChaIn,
 													String anzCha, String anzCar, String anzCarIn, String anzGae01, String anzGae02, String anzGae03, String anzGae04, String anzGongDate, String anzCuConfirm,
 													String anzCuConfirmTel, String anzCuSmsYn, String anzGongNo, String anzGongName, String anzSignYn, String gpsX, String gpsY, String appUser,
-													String anzFinishDate, String anzCircuitDate){
+													String anzFinishDate, String anzCircuitDate, String contFileUrl){
 
 		SimpleJdbcCall simpleJdbcCall = new SimpleJdbcCall(jdbcTemplate);
 
@@ -333,7 +333,8 @@ public class AnSobiRepository extends GasMaxRepository{
 				.addValue("pi_GPS_Y", gpsY)
 				.addValue("pi_ANZ_APP_User", appUser)
 				.addValue("pi_Finish_DATE", anzFinishDate)
-				.addValue("pi_CirCuit_DATE",anzCircuitDate);
+				.addValue("pi_CirCuit_DATE",anzCircuitDate)
+				.addValue("pi_CONT_FILE_URL", contFileUrl);
 
 		Map<String, Object> out = simpleJdbcCall.execute(inputParam);
 

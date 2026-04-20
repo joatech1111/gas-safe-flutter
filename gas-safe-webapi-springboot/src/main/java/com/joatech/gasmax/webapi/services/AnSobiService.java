@@ -379,7 +379,8 @@ public class AnSobiService implements IAnSobiService {
 				anSobi.getGpsY(),
 				anSobi.getAppUser(),
 				anSobi.getAnzFinishDate(),
-				anSobi.getAnzCircuitDate());
+				anSobi.getAnzCircuitDate(),
+				anSobi.getContFileUrl());
 	}
 
 

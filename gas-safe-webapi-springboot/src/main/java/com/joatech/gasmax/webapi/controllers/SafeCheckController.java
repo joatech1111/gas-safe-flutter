@@ -2951,6 +2951,11 @@ public class SafeCheckController {
 			nodeName = "ANZ_Circuit_DATE";
 			anSobi.setAnzCircuitDate(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
 
+			nodeName = "CONT_FILE_URL";
+			if (jsonRootNode.has(nodeName)) {
+				anSobi.setContFileUrl(GasMaxUtility.parseJsonNodeToString(jsonRootNode, nodeName));
+			}
+
 		}
 
 		return anSobi;

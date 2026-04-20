@@ -94,4 +94,5 @@ public class AnSobi implements Serializable {
 	private String appUser = "";
 	private String anzFinishDate = "";
 	private String anzCircuitDate = "";
+	private String contFileUrl = "";
 }

@@ -398,11 +398,19 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
     };
 
     if (!mounted) return;
+
+    debugPrint('▶ [EquipSave] isNew=$_isNew, anzSno=$_anzSno');
+    debugPrint('▶ [EquipSave] AREA_CODE=${req['AREA_CODE']}, ANZ_Cu_Code=${req['ANZ_Cu_Code']}');
+    debugPrint('▶ [EquipSave] ANZ_Date=${req['ANZ_Date']}, ANZ_Finish_DATE=${req['ANZ_Finish_DATE']}, ANZ_Circuit_DATE=${req['ANZ_Circuit_DATE']}');
+    debugPrint('▶ [EquipSave] APP_User=${req['APP_User']}, ANZ_SW_Code=${req['ANZ_SW_Code']}');
+
     final resp = await NetHelper.request(
       context,
       () => _isNew ? NetHelper.api.safetyEquipInsertNew(req) : NetHelper.api.safetyEquipUpdateNew(req),
     );
     if (!mounted) return;
+
+    debugPrint('▶ [EquipSave] response: $resp');
 
     if (NetHelper.isSuccess(resp)) {
       Fluttertoast.showToast(msg: _isNew ? '저장되었습니다.' : '수정되었습니다.');
