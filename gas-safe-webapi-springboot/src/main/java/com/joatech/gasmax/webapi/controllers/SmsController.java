@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.DefaultResponseErrorHandler;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
@@ -38,7 +39,14 @@ public class SmsController {
 	private final RestTemplate restTemplate = buildRestTemplate();
 
 	private static RestTemplate buildRestTemplate() {
-		RestTemplate rt = new RestTemplate();
+		// HttpURLConnection이 streaming mode에서 401 받았을 때
+		// HttpRetryException 던지는 문제 회피
+		SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+		factory.setOutputStreaming(false);
+		factory.setConnectTimeout(10000);
+		factory.setReadTimeout(30000);
+
+		RestTemplate rt = new RestTemplate(factory);
 		// upstream 4xx/5xx 응답을 예외 대신 그대로 반환받도록 처리
 		rt.setErrorHandler(new DefaultResponseErrorHandler() {
 			@Override
