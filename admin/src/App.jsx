@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react'
 
 const API_BASE = '/gas/api/admin'
+const REQUIRED_KEYS = ['HP_SNO', 'Login_Name', 'Login_User', 'Login_Pass']
 
 const COLUMNS = [
   { key: 'HP_IMEI', label: 'IMEI', width: 220 },
   { key: 'HP_State', label: '상태', width: 60 },
   { key: 'HP_Model', label: '모델', width: 140 },
   { key: 'HP_SNO', label: '전화번호', width: 120 },
+  { key: 'Login_StartDate', label: '등록일', width: 150 },
+  { key: 'Login_LastDate', label: '최종접속', width: 150 },
   { key: 'APP_VER', label: '앱버전', width: 90 },
   { key: 'SVR_IP', label: '서버IP', width: 160 },
   { key: 'SVR_DBName', label: 'DB명', width: 100 },
@@ -22,8 +25,6 @@ const COLUMNS = [
   { key: 'BA_OrderBy', label: '정렬', width: 60 },
   { key: 'Safe_SW_CODE', label: 'Safe코드', width: 80 },
   { key: 'License_Date', label: '라이센스', width: 110 },
-  { key: 'Login_StartDate', label: '시작일', width: 110 },
-  { key: 'Login_LastDate', label: '최종접속', width: 150 },
   { key: 'Login_EndDate', label: '종료일', width: 110 },
   { key: 'Login_info', label: '로그인정보', width: 100 },
   { key: 'Login_Memo', label: '메모', width: 120 },
@@ -33,6 +34,39 @@ const COLUMNS = [
 
 const EMPTY_ROW = COLUMNS.reduce((acc, col) => ({ ...acc, [col.key]: '' }), {})
 
+const generateImei = () => {
+  const ts = Date.now()
+  const rand = Math.floor(10000 + Math.random() * 90000)
+  return `WEB_${ts}_${rand}`
+}
+
+const nowString = () => {
+  const d = new Date()
+  const pad = n => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+const createDefaultRow = () => ({
+  ...EMPTY_ROW,
+  HP_IMEI: generateImei(),
+  HP_State: 'Y',
+  HP_Model: 'Web',
+  APP_VER: '3.0.1010',
+  SVR_IP: 'joatech.dyndns.org',
+  SVR_DBName: 'GasMax_Sample',
+  SVR_User: 'GasMax_Sample',
+  SVR_Pass: 'GasMax_PASS',
+  SVR_Port: '2521',
+  BA_Area_CODE: '02',
+  BA_SW_CODE: '01',
+  BA_OrderBy: '0',
+  Safe_SW_CODE: '01',
+  License_Date: '99991231',
+  Login_StartDate: nowString(),
+  APP_Cert: '0000000',
+  GPS_SEARCH_YN: 'Y',
+})
+
 export default function App() {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
@@ -40,7 +74,7 @@ export default function App() {
   const [editRow, setEditRow] = useState(null)
   const [editData, setEditData] = useState({})
   const [insertMode, setInsertMode] = useState(false)
-  const [newData, setNewData] = useState({ ...EMPTY_ROW })
+  const [newData, setNewData] = useState(createDefaultRow())
   const [search, setSearch] = useState('')
 
   const fetchUsers = useCallback(async () => {
@@ -136,13 +170,18 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newData),
       })
-      const json = await res.json()
+      const text = await res.text()
+      if (!text) {
+        alert('등록 실패: 서버에서 빈 응답')
+        return
+      }
+      const json = JSON.parse(text)
       if (json.resultCode === 0) {
         setInsertMode(false)
-        setNewData({ ...EMPTY_ROW })
+        setNewData(createDefaultRow())
         fetchUsers()
       } else {
-        alert('등록 실패: ' + json.result)
+        alert('등록 실패: ' + (json.resultData || json.result))
       }
     } catch (e) {
       alert('등록 실패: ' + e.message)
@@ -183,21 +222,37 @@ export default function App() {
         <div style={styles.insertPanel}>
           <h3 style={styles.insertTitle}>신규 사용자 등록</h3>
           <div style={styles.insertGrid}>
-            {COLUMNS.map(col => (
-              <div key={col.key} style={styles.insertField}>
-                <label style={styles.insertLabel}>{col.label}</label>
-                <input
-                  style={styles.insertInput}
-                  value={newData[col.key]}
-                  onChange={e => setNewData(prev => ({ ...prev, [col.key]: e.target.value }))}
-                  placeholder={col.key}
-                />
-              </div>
-            ))}
+            {COLUMNS.map(col => {
+              const isRequired = REQUIRED_KEYS.includes(col.key)
+              return (
+                <div key={col.key} style={{
+                  ...styles.insertField,
+                  ...(isRequired ? { background: '#fffbeb', border: '2px solid #f59e0b', borderRadius: '8px', padding: '8px' } : {}),
+                }}>
+                  <label style={{
+                    ...styles.insertLabel,
+                    ...(isRequired ? { color: '#d97706', fontWeight: 700, fontSize: '13px' } : {}),
+                  }}>
+                    {isRequired ? `* ${col.label} (필수)` : col.label}
+                  </label>
+                  <input
+                    style={{
+                      ...styles.insertInput,
+                      ...(isRequired ? { border: '2px solid #f59e0b', background: '#fff', fontSize: '14px' } : {}),
+                      ...(col.key === 'HP_IMEI' ? { background: '#e2e8f0', color: '#64748b' } : {}),
+                    }}
+                    value={newData[col.key]}
+                    onChange={e => setNewData(prev => ({ ...prev, [col.key]: e.target.value }))}
+                    placeholder={isRequired ? `${col.label} 입력` : col.key}
+                    readOnly={col.key === 'HP_IMEI'}
+                  />
+                </div>
+              )
+            })}
           </div>
           <div style={styles.insertActions}>
             <button style={styles.btnSave} onClick={handleInsert}>등록</button>
-            <button style={styles.btnCancel} onClick={() => { setInsertMode(false); setNewData({ ...EMPTY_ROW }) }}>취소</button>
+            <button style={styles.btnCancel} onClick={() => { setInsertMode(false); setNewData(createDefaultRow()) }}>취소</button>
           </div>
         </div>
       )}
@@ -393,20 +448,17 @@ const styles = {
     cursor: 'pointer',
   },
   tableWrap: {
-    display: 'block',
-    overflowX: 'auto',
-    overflowY: 'auto',
-    width: '100%',
+    overflow: 'auto',
+    maxWidth: 'calc(100vw - 40px)',
+    maxHeight: 'calc(100vh - 180px)',
     background: '#fff',
     borderRadius: '12px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-    WebkitOverflowScrolling: 'touch',
   },
   table: {
     width: '2400px',
     borderCollapse: 'collapse',
     fontSize: '13px',
-    tableLayout: 'fixed',
   },
   th: {
     padding: '12px 10px',

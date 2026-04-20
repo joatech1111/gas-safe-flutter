@@ -79,7 +79,7 @@ public class AppUserSafeRepository extends GasMaxRepository {
 							 +  " BA_JY_Code, BA_OrderBy,Safe_SW_CODE , License_Date, Login_StartDate, Login_LastDate, Login_EndDate,"
 							 +  " Login_info, Login_Memo, APP_Cert, GPS_SEARCH_YN from APPUser_Safe "
 							 +  " WHERE HP_State = 'Y'"
-							 +  " ORDER BY Login_StartDate DESC";
+							 +  " ORDER BY CONVERT(DATETIME, Login_StartDate) DESC";
 
 
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(queryString);
