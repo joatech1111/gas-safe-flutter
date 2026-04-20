@@ -94,4 +94,27 @@ public class AppUserSafeService implements IAppUserSafeService {
 		return rowCount;
 	}
 
+	@Override
+	public int adminUpdateUser(String hpImei, Map<String, String> data) {
+		repo = new AppUserSafeRepository(config.getDbHostname(), config.getDbPortNumber(), config.getDbName(), config.getDbUsername(), config.getDbPassword());
+		int rows = repo.adminUpdateUser(hpImei, data);
+		repo.close();
+		return rows;
+	}
+
+	@Override
+	public int adminInsertUser(Map<String, String> data) {
+		repo = new AppUserSafeRepository(config.getDbHostname(), config.getDbPortNumber(), config.getDbName(), config.getDbUsername(), config.getDbPassword());
+		int rows = repo.adminInsertUser(data);
+		repo.close();
+		return rows;
+	}
+
+	@Override
+	public int adminDeleteUser(String hpImei) {
+		repo = new AppUserSafeRepository(config.getDbHostname(), config.getDbPortNumber(), config.getDbName(), config.getDbUsername(), config.getDbPassword());
+		int rows = repo.adminDeleteUser(hpImei);
+		repo.close();
+		return rows;
+	}
 }

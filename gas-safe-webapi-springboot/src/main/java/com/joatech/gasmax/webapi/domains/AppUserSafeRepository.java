@@ -78,7 +78,8 @@ public class AppUserSafeRepository extends GasMaxRepository {
 		 					 +  " Login_Co, Login_Name, Login_User, Login_Pass, BA_Area_CODE, BA_SW_CODE, BA_Gubun_CODE,"
 							 +  " BA_JY_Code, BA_OrderBy,Safe_SW_CODE , License_Date, Login_StartDate, Login_LastDate, Login_EndDate,"
 							 +  " Login_info, Login_Memo, APP_Cert, GPS_SEARCH_YN from APPUser_Safe "
-							 +  " WHERE HP_State = 'Y'";
+							 +  " WHERE HP_State = 'Y'"
+							 +  " ORDER BY Login_StartDate DESC";
 
 
 		List<Map<String, Object>> rows = jdbcTemplate.queryForList(queryString);
@@ -284,9 +285,89 @@ public class AppUserSafeRepository extends GasMaxRepository {
 	}
 
 	public int updateAppUserSafeForAppVersionAndLoginLastDateByHpImei(String appVersion, String loginLastDate, String hpImei) {
-		
+
 		String queryString = "UPDATE APPUser_Safe SET APP_VER = ?, Login_LastDate = ? WHERE HP_State = 'Y' AND HP_IMEI = ?";
 
         return jdbcTemplate.update(queryString, appVersion, loginLastDate, hpImei);
+	}
+
+	public int adminUpdateUser(String hpImei, Map<String, String> data) {
+		StringBuilder sb = new StringBuilder("UPDATE APPUser_Safe SET ");
+		List<Object> params = new ArrayList<>();
+
+		Map<String, String> fieldMap = getFieldMap();
+		boolean first = true;
+		for (Map.Entry<String, String> entry : data.entrySet()) {
+			String col = fieldMap.get(entry.getKey());
+			if (col != null && !"HP_IMEI".equals(col)) {
+				if (!first) sb.append(", ");
+				sb.append(col).append(" = ?");
+				params.add(entry.getValue());
+				first = false;
+			}
+		}
+		if (first) return 0;
+
+		sb.append(" WHERE HP_IMEI = ?");
+		params.add(hpImei);
+		return jdbcTemplate.update(sb.toString(), params.toArray());
+	}
+
+	public int adminInsertUser(Map<String, String> data) {
+		Map<String, String> fieldMap = getFieldMap();
+		List<String> cols = new ArrayList<>();
+		List<Object> params = new ArrayList<>();
+		List<String> placeholders = new ArrayList<>();
+
+		for (Map.Entry<String, String> entry : data.entrySet()) {
+			String col = fieldMap.get(entry.getKey());
+			if (col != null && entry.getValue() != null && !entry.getValue().isEmpty()) {
+				cols.add(col);
+				params.add(entry.getValue());
+				placeholders.add("?");
+			}
+		}
+		if (cols.isEmpty()) return 0;
+
+		String queryString = "INSERT INTO APPUser_Safe (" + String.join(", ", cols) + ") VALUES (" + String.join(", ", placeholders) + ")";
+		return jdbcTemplate.update(queryString, params.toArray());
+	}
+
+	public int adminDeleteUser(String hpImei) {
+		String queryString = "DELETE FROM APPUser_Safe WHERE HP_IMEI = ?";
+		return jdbcTemplate.update(queryString, hpImei);
+	}
+
+	private Map<String, String> getFieldMap() {
+		Map<String, String> m = new java.util.LinkedHashMap<>();
+		m.put("HP_IMEI", "HP_IMEI");
+		m.put("HP_State", "HP_State");
+		m.put("HP_Model", "HP_Model");
+		m.put("HP_SNO", "HP_SNO");
+		m.put("APP_VER", "APP_VER");
+		m.put("SVR_IP", "SVR_IP_NO");
+		m.put("SVR_DBName", "SVR_DBName");
+		m.put("SVR_User", "SVR_User");
+		m.put("SVR_Pass", "SVR_Pass");
+		m.put("SVR_Port", "SVR_Port");
+		m.put("Login_Co", "Login_Co");
+		m.put("Login_Name", "Login_Name");
+		m.put("Login_User", "Login_User");
+		m.put("Login_Pass", "Login_Pass");
+		m.put("BA_Area_CODE", "BA_Area_CODE");
+		m.put("BA_SW_CODE", "BA_SW_CODE");
+		m.put("BA_Gubun_CODE", "BA_Gubun_CODE");
+		m.put("BA_JY_Code", "BA_JY_Code");
+		m.put("BA_OrderBy", "BA_OrderBy");
+		m.put("Safe_SW_CODE", "Safe_SW_CODE");
+		m.put("License_Date", "License_Date");
+		m.put("Login_StartDate", "Login_StartDate");
+		m.put("Login_LastDate", "Login_LastDate");
+		m.put("Login_EndDate", "Login_EndDate");
+		m.put("Login_info", "Login_info");
+		m.put("Login_Memo", "Login_Memo");
+		m.put("APP_Cert", "APP_Cert");
+		m.put("GPS_SEARCH_YN", "GPS_SEARCH_YN");
+		return m;
 	}
 }

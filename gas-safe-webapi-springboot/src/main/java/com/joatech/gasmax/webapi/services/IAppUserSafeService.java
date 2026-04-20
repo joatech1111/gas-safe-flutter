@@ -15,5 +15,8 @@ public interface IAppUserSafeService {
 	
 	Map<String, Object> addNewAppUserSafe(AppUserSafe appUserSafe);
 	int updateAppUserSafe(String appVersion, String loginLastDate, String hpImei);
-	
+
+	int adminUpdateUser(String hpImei, Map<String, String> data);
+	int adminInsertUser(Map<String, String> data);
+	int adminDeleteUser(String hpImei);
 }

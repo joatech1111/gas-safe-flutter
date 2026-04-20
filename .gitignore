@@ -43,3 +43,15 @@ app.*.map.json
 /android/app/profile
 /android/app/release
 deploy/
+
+# Contract PDFs (generated)
+AnCont_pdf/
+gas-safe-webapi-springboot/AnCont_pdf/
+
+# Admin web (Node)
+admin/node_modules/
+admin/dist/
+
+# Flutter build artifacts (only build/web is tracked)
+/build/*
+!/build/web/
