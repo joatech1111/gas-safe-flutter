@@ -80,6 +80,8 @@ public class AppUserSafeService implements IAppUserSafeService {
 	public Map<String, Object> addNewAppUserSafe(AppUserSafe appUserSafe) {
 		repo = new AppUserSafeRepository(config.getDbHostname(), config.getDbPortNumber(), config.getDbName(), config.getDbUsername(), config.getDbPassword());
 		Map<String, Object> result = repo.executeAppUserSafeAuthenticate(appUserSafe.getHpImei(), appUserSafe.getHpModel(), appUserSafe.getHpSNo(), appUserSafe.getAppVersion(), appUserSafe.getLoginCo(), appUserSafe.getLoginName(), appUserSafe.getLoginUser(), appUserSafe.getLoginPassword());
+		// 가입 후 Safe_SW_CODE 기본값 "01" 설정
+		repo.updateSafeSwCode(appUserSafe.getHpSNo(), "01");
 		repo.close();
 		return result;
 	}

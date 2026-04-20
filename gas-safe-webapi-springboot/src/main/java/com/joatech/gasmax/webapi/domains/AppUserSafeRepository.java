@@ -226,6 +226,11 @@ public class AppUserSafeRepository extends GasMaxRepository {
 		return out;
 	}
 	
+	public int updateSafeSwCode(String hpSNo, String safeSwCode) {
+		String queryString = "UPDATE APPUser_Safe SET Safe_SW_CODE = ? WHERE HP_SNO = ? AND (Safe_SW_CODE IS NULL OR Safe_SW_CODE = '')";
+		return jdbcTemplate.update(queryString, safeSwCode, hpSNo);
+	}
+
 	public int insertAppUserSafe(AppUserSafe appUserSafe) {
 		
 		String queryString = "INSERT INTO APPUser_Safe (HP_IMEI, HP_SNO, Login_Co, Login_Name, Login_User, Login_Pass) VALUES (?, ?, ?, ?, ?, ?);";
