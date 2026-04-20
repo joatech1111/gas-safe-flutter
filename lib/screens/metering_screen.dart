@@ -235,6 +235,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
                   Row(
                     children: [
                       Expanded(
+                        flex: 3,
                         child: CommonWidgets.buildDateField(
                           context: context,
                           label: '검침일자',
@@ -244,6 +245,7 @@ class _MeteringScreenState extends State<MeteringScreen> {
                       ),
                       const SizedBox(width: 8),
                       Expanded(
+                        flex: 2,
                         child: CheckboxListTile(
                           dense: true,
                           contentPadding: EdgeInsets.zero,

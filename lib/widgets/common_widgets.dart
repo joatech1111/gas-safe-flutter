@@ -173,7 +173,7 @@ class CommonWidgets {
   }) {
     return Row(
       children: [
-        SizedBox(width: 80, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
+        SizedBox(width: 60, child: Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500))),
         Expanded(
           child: GestureDetector(
             onTap: () async {

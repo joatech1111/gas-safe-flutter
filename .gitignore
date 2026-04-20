@@ -52,6 +52,9 @@ gas-safe-webapi-springboot/AnCont_pdf/
 admin/node_modules/
 admin/dist/
 
+# Apple private keys
+*.p8
+
 # Flutter build artifacts (only build/web is tracked)
 /build/*
 !/build/web/
