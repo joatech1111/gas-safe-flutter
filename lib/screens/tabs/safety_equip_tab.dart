@@ -119,11 +119,11 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
   bool _loaded = false;
 
   // Spinner options
-  static const _burnerTypes = ['', 'FF', 'FE', 'CF'];
-  static const _burnerLocations = ['', '옥내', '옥외', '전용'];
-  static const _burnerLocations2 = ['', '옥내', '옥외'];
+  static const _burnerTypes = ['선택', 'FF', 'FE', 'CF'];
+  static const _burnerLocations = ['선택', '옥내', '옥외', '전용'];
+  static const _burnerLocations2 = ['선택', '옥내', '옥외'];
   static const _checkResultOptions = [
-    MapEntry('0', ''),
+    MapEntry('0', '선택'),
     MapEntry('1', '적합'),
     MapEntry('2', '부적합'),
   ];
@@ -848,7 +848,7 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
                     value: e.key,
                     child: Text(e.value.value, style: TextStyle(
                       fontSize: 11,
-                      color: e.key == 2 ? Colors.red : Colors.black87,
+                      color: e.key == 0 ? Colors.grey : e.key == 2 ? Colors.red : Colors.black87,
                     )),
                   )).toList(),
                   onChanged: (v) {
@@ -1077,7 +1077,10 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
               style: TextStyle(fontSize: AppInput.fontSize, color: Colors.black87),
               items: items.asMap().entries.map((e) => DropdownMenuItem<int>(
                 value: e.key,
-                child: Text(e.value.isEmpty ? ' ' : e.value, style: TextStyle(fontSize: AppInput.fontSize)),
+                child: Text(e.value.isEmpty ? '선택' : e.value, style: TextStyle(
+                  fontSize: AppInput.fontSize,
+                  color: e.value.isEmpty ? Colors.grey : Colors.black87,
+                )),
               )).toList(),
               onChanged: (v) { if (v != null) onChanged(v); },
             ),
