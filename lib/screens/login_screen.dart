@@ -163,6 +163,23 @@ class _LoginScreenState extends State<LoginScreen> {
       if (singleData != null) {
         final authLogin =
             AuthLogin.fromJson(singleData as Map<String, dynamic>);
+
+        // 로그인 응답에 업체명이 없으면 업체 조회 결과 또는 저장된 사용자 정보에서 보완
+        if (authLogin.loginCo == null || authLogin.loginCo!.trim().isEmpty) {
+          // 1) 업체 선택 시 받아온 데이터에서 보완
+          if (_selectedUser != null) {
+            final co = _selectedUser!['Login_Co']?.toString() ?? '';
+            if (co.isNotEmpty) authLogin.loginCo = co;
+          }
+          // 2) 자동 로그인 시 이전 저장된 사용자 정보에서 보완
+          if (authLogin.loginCo == null || authLogin.loginCo!.trim().isEmpty) {
+            final saved = AppState.getLoginUser();
+            if (saved != null && saved.loginCo != null && saved.loginCo!.trim().isNotEmpty) {
+              authLogin.loginCo = saved.loginCo;
+            }
+          }
+        }
+
         AppState.setLoginUser(authLogin);
 
         PrefsUtil.clearKeysStartWith('CACHE_SEARCH_CONDITION_');
