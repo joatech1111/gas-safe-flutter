@@ -1,0 +1,22 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="110" fill="white"/>
+  <path d="M380 120C410 180 440 280 430 380C425 430 400 470 340 475C380 400 395 300 380 180C375 140 370 120 380 120Z" fill="#D1D1D1"/>
+  <path d="M230 40C260 140 380 240 380 370C380 450 320 490 240 490C140 490 190 400 230 320C270 240 185 130 230 40Z" fill="#FFB300"/>
+  <path d="M125 300C145 350 185 410 185 455C185 480 165 490 135 490C105 490 125 440 130 390C135 340 110 320 125 300Z" fill="#FFC107"/>
+  <rect x="25" y="325" width="462" height="110" rx="2" fill="#1A1A1A"/>
+  <rect x="40" y="340" width="258" height="80" rx="2" fill="#000" stroke="#333" stroke-width="1"/>
+  <rect x="306" y="340" width="152" height="80" rx="2" fill="#E60000"/>
+  <g font-family="monospace" font-weight="900" font-size="54" fill="white">
+     <text x="45" y="398">0</text>
+     <text x="96" y="398">0</text>
+     <text x="147" y="398">3</text>
+     <text x="198" y="398">4</text>
+     <text x="249" y="398">3</text>
+     <text x="315" y="398">4</text>
+     <text x="365" y="398">2</text>
+     <text x="415" y="398">1</text>
+  </g>
+  <text x="465" y="398" fill="white" font-family="sans-serif" font-weight="bold" font-size="40">=</text>
+  <text x="260" y="432" fill="white" font-family="Arial" font-weight="bold" font-size="14">m³</text>
+  <text x="415" y="432" fill="white" font-family="Arial" font-weight="bold" font-size="14">dm³</text>
+</svg>
