@@ -40,9 +40,7 @@ class _SafetyCheckScreenState extends State<SafetyCheckScreen> with SingleTicker
           icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 22),
           onPressed: () => Navigator.pop(context),
         ),
-        actions: [
-          IconButton(icon: const Icon(Icons.search, color: Colors.black87), onPressed: () {}),
-        ],
+        actions: const [],
       ),
       // Android와 동일: 하단 탭바 (36dp, #DAD8D1 배경)
       bottomNavigationBar: SafeArea(
