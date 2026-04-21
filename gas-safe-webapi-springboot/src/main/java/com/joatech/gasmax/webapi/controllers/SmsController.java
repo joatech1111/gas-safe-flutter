@@ -72,7 +72,14 @@ public class SmsController {
 		String recvNo = body.get("recvNo");
 		String text = body.get("text");
 		String subject = body.getOrDefault("subject", DEFAULT_SUBJECT);
-		String type = body.getOrDefault("type", "SMS");
+
+		// Delphi 원본 로직과 동일: 90바이트 초과 시 MMS 자동 전환
+		String type;
+		if (text != null && text.trim().getBytes(java.nio.charset.StandardCharsets.UTF_8).length > 90) {
+			type = "MMS";
+		} else {
+			type = body.getOrDefault("type", "SMS");
+		}
 
 		if (recvNo == null || recvNo.trim().isEmpty()) {
 			return new RestAPIResult("fail", HttpStatus.BAD_REQUEST.value(),
