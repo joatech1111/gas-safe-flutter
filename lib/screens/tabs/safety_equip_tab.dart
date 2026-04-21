@@ -455,10 +455,12 @@ class _SafetyEquipTabState extends State<SafetyEquipTab> with AutomaticKeepAlive
     final tel = _confirmTelController.text.trim().replaceAll('-', '');
     if (tel.isEmpty) { Fluttertoast.showToast(msg: 'SMS번호를 입력해주세요.'); return; }
 
-    if (kIsWeb) {
+    if (SmsService.isDesktopWeb) {
+      // PC 크롬 → API로 발송
       final res = await SmsService().sendSms(recvNo: tel, text: smsMsg);
       Fluttertoast.showToast(msg: res.success ? '문자 발송 완료' : '문자 발송 실패');
     } else {
+      // 모바일(앱/모바일 크롬) → 폰 SMS
       final uri = Uri(scheme: 'sms', path: tel, queryParameters: {'body': smsMsg});
       if (await canLaunchUrl(uri)) { await launchUrl(uri); }
     }

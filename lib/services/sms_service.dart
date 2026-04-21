@@ -1,11 +1,25 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../network/net_config.dart';
+import 'platform_util_stub.dart' if (dart.library.html) 'platform_util_web.dart';
 
 class SmsService {
   final Dio _dio = Dio();
+
+  /// PC 크롬 환경인지 판별 (모바일 크롬은 false)
+  static bool get isDesktopWeb {
+    if (!kIsWeb) return false;
+    final ua = getUserAgent();
+    if (ua.isEmpty) return true; // UA 못 가져오면 PC로 간주
+    const mobileKeywords = ['Android', 'iPhone', 'iPad', 'iPod', 'Mobile', 'webOS', 'BlackBerry'];
+    for (final keyword in mobileKeywords) {
+      if (ua.contains(keyword)) return false;
+    }
+    return true;
+  }
 
   Future<SmsResult> sendSms({
     required String recvNo,
