@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../network/net_config.dart';
@@ -30,11 +32,16 @@ class SmsService {
           .replaceAll('△', '-')
           .replaceAll('▲', '-');
 
+      // Delphi 원본 로직과 동일: 90바이트 초과 시 MMS 자동 전환
+      final textBytes = utf8.encode(cleanText.trim());
+      final smsType = textBytes.length > 90 ? 'MMS' : 'SMS';
+
       final response = await _dio.post(
         url,
         data: {
           'recvNo': recvNo,
           'text': cleanText,
+          'type': smsType,
           if (subject != null) 'subject': subject,
         },
         options: Options(
