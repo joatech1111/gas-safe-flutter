@@ -1,10 +1,12 @@
 import 'dart:convert';
 import '../../widgets/logo_loader.dart';
 import '../../widgets/signature_pad.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../services/sms_service.dart';
 import '../../models/combo_data.dart';
 import '../../models/safety_customer_result_data.dart';
 import '../../models/safety_tank_result_data.dart';
@@ -274,8 +276,14 @@ class _SafetyTankTabState extends State<SafetyTankTab> with AutomaticKeepAliveCl
 
     final tel = _anzCuConfirmTelController.text.trim().replaceAll('-', '');
     if (tel.isEmpty) { Fluttertoast.showToast(msg: '확인 연락처를 입력해주세요.'); return; }
-    final uri = Uri(scheme: 'sms', path: tel, queryParameters: {'body': smsMsg});
-    if (await canLaunchUrl(uri)) { await launchUrl(uri); }
+
+    if (kIsWeb) {
+      final res = await SmsService().sendSms(recvNo: tel, text: smsMsg);
+      Fluttertoast.showToast(msg: res.success ? '문자 발송 완료' : '문자 발송 실패');
+    } else {
+      final uri = Uri(scheme: 'sms', path: tel, queryParameters: {'body': smsMsg});
+      if (await canLaunchUrl(uri)) { await launchUrl(uri); }
+    }
   }
 
   // Result dropdown values matching Kotlin spinner_default_check_result
