@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../network/net_config.dart';
@@ -13,11 +15,17 @@ class SmsService {
     final url = '${NetConfig.baseUrl}sms/send';
 
     try {
+      final cleanText = text.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+      // 한글 등 멀티바이트 고려: 90바이트 초과 시 LMS
+      final byteLen = utf8.encode(cleanText).length;
+      final type = byteLen > 90 ? 'LMS' : 'SMS';
+
       final response = await _dio.post(
         url,
         data: {
           'recvNo': recvNo,
-          'text': text.replaceAll('\r\n', '\n').replaceAll('\r', '\n'),
+          'text': cleanText,
+          'type': type,
           if (subject != null) 'subject': subject,
         },
         options: Options(
