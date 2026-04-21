@@ -13,11 +13,28 @@ class SmsService {
     final url = '${NetConfig.baseUrl}sms/send';
 
     try {
+      final cleanText = text
+          .replaceAll('\r\n', '\n')
+          .replaceAll('\r', '\n')
+          .replaceAll('▶', '>')
+          .replaceAll('☏', 'TEL')
+          .replaceAll('★', '*')
+          .replaceAll('☆', '*')
+          .replaceAll('●', '-')
+          .replaceAll('■', '-')
+          .replaceAll('□', '-')
+          .replaceAll('◆', '-')
+          .replaceAll('◇', '-')
+          .replaceAll('▷', '>')
+          .replaceAll('◁', '<')
+          .replaceAll('△', '-')
+          .replaceAll('▲', '-');
+
       final response = await _dio.post(
         url,
         data: {
           'recvNo': recvNo,
-          'text': text.replaceAll('\r\n', '\n').replaceAll('\r', '\n'),
+          'text': cleanText,
           if (subject != null) 'subject': subject,
         },
         options: Options(
