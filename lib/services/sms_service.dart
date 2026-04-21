@@ -17,7 +17,7 @@ class SmsService {
         url,
         data: {
           'recvNo': recvNo,
-          'text': text,
+          'text': text.replaceAll('\r\n', '\n').replaceAll('\r', '\n'),
           if (subject != null) 'subject': subject,
         },
         options: Options(
